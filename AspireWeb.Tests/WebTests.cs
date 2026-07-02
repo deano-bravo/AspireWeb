@@ -4,7 +4,10 @@ namespace AspireWeb.Tests;
 
 public class WebTests
 {
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
+    // Generous because startup now covers a Postgres image pull (cold Docker cache) plus the
+    // migration service running to completion; healthy runs don't pay this, it only bounds failures.
+    // These tests require a running Docker engine.
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(3);
 
     [Fact]
     public async Task GetWebResourceRootReturnsOkStatusCode()
