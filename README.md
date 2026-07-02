@@ -30,4 +30,4 @@ dotnet tool restore   # installs the pinned Aspire CLI (.config/dotnet-tools.jso
 ## Open the app
 
 - **Local:** `aspire run`, then click the `webfrontend` endpoint in the dashboard.
-- **Kubernetes (HTTPS):** **[https://localhost](https://localhost)** — self-signed cert, so accept the browser warning. One-time setup steps are in [CLAUDE.md](CLAUDE.md).
+- **Kubernetes (HTTPS):** **[https://localhost](https://localhost)** — trusted locally via a dev CA (run `./k8s/gen-cert.sh` then `powershell -File k8s/trust-ca.ps1` once, and restart the browser). Full setup in [CLAUDE.md](CLAUDE.md).

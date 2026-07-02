@@ -67,25 +67,28 @@ kubectl create namespace aspireweb
 helm upgrade --install aspireweb ./aspire-output -n aspireweb
 ```
 
-### HTTPS access (self-signed cert via ingress)
+### HTTPS access (locally-trusted cert via ingress)
 
-The front end is reached over HTTPS through an nginx ingress that terminates TLS with a self-signed
-cert; the app itself serves plain HTTP inside the cluster (`ASPNETCORE_FORWARDEDHEADERS_ENABLED`
-in the generated config makes `UseHttpsRedirection` honour the ingress `X-Forwarded-Proto`). Files
-live under [k8s/](k8s/): `ingress.yaml` (committed) and `gen-cert.sh` (creates the cert + the
-`aspireweb-tls` secret; the private key in `k8s/.certs/` is git-ignored). One-time per cluster:
+The front end is reached over HTTPS through an nginx ingress that terminates TLS. A local root CA
+issues the `localhost` leaf cert; trusting that CA once means the browser shows **no warning**. The
+app itself serves plain HTTP inside the cluster (`ASPNETCORE_FORWARDEDHEADERS_ENABLED` in the
+generated config makes `UseHttpsRedirection` honour the ingress `X-Forwarded-Proto`). Files live
+under [k8s/](k8s/): `ingress.yaml` and `gen-cert.sh`/`trust-ca.ps1` (committed); the CA + keys in
+`k8s/.certs/` are git-ignored. One-time per cluster/machine:
 
 ```powershell
 helm upgrade --install ingress-nginx ingress-nginx --repo https://kubernetes.github.io/ingress-nginx -n ingress-nginx --create-namespace
 ```
 
 ```bash
-./k8s/gen-cert.sh                 # self-signed cert + aspireweb-tls secret (Git Bash)
+./k8s/gen-cert.sh                        # CA + localhost cert + aspireweb-tls secret (Git Bash)
+powershell -File k8s/trust-ca.ps1        # trust the CA in CurrentUser\Root (then restart browser)
 kubectl apply -f k8s/ingress.yaml
 ```
 
-Verify: `kubectl get pods -n aspireweb` (expect all `Running`), then open <https://localhost>
-(accept the self-signed warning) — the `/weather` page must render data fetched from `apiservice`.
+Verify: `kubectl get pods -n aspireweb` (all `Running`), then open <https://localhost> — no cert
+warning, and the `/weather` page renders data fetched from `apiservice`. (`curl` from Git Bash uses
+its own CA bundle, so verify trust with `Invoke-WebRequest https://localhost/` in PowerShell instead.)
 Plain-HTTP alternative: `kubectl port-forward -n aspireweb svc/webfrontend-service 8088:8080`.
 Teardown: `helm uninstall aspireweb -n aspireweb; kubectl delete ns aspireweb`.
 
