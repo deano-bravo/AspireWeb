@@ -2,6 +2,8 @@
 description: Validate the solution — restore, build (warnings as errors), and run tests
 ---
 
+# Validate
+
 Validate the AspireWeb solution end-to-end and report the results concisely.
 
 1. `aspire restore` (fall back to `dotnet restore AspireWeb.slnx` if the Aspire CLI is unavailable).

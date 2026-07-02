@@ -15,7 +15,7 @@ ServiceDefaults library and an integration test project.
 ## Projects
 
 | Project | Path | Role |
-|---|---|---|
+| --- | --- | --- |
 | AppHost | [AspireWeb.AppHost/](AspireWeb.AppHost/) | Aspire orchestrator & entry point. Wires resources in [AppHost.cs](AspireWeb.AppHost/AppHost.cs). |
 | ApiService | [AspireWeb.ApiService/](AspireWeb.ApiService/) | Minimal-API backend (`/weatherforecast`, `/health`). |
 | Web | [AspireWeb.Web/](AspireWeb.Web/) | Blazor Server front end. Calls the API via `WeatherApiClient`. |
@@ -69,7 +69,7 @@ helm upgrade --install aspireweb ./aspire-output -n aspireweb
 
 Verify: `kubectl get pods -n aspireweb` (expect all `Running`), then
 `kubectl port-forward -n aspireweb svc/webfrontend-service 8088:8080` and open
-http://localhost:8088 — the `/weather` page must render data fetched from `apiservice`.
+<http://localhost:8088> — the `/weather` page must render data fetched from `apiservice`.
 Teardown: `helm uninstall aspireweb -n aspireweb; kubectl delete ns aspireweb`.
 
 Notes: generated Helm services are **ClusterIP** (use port-forward, or patch to NodePort/LoadBalancer);

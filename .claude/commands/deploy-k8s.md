@@ -2,6 +2,8 @@
 description: Build images and deploy AspireWeb to local Docker Desktop Kubernetes via Helm
 ---
 
+# Deploy to Kubernetes
+
 Deploy AspireWeb to the local Docker Desktop Kubernetes cluster using local images (no registry).
 Confirm the active kube context is `docker-desktop` before applying anything.
 
