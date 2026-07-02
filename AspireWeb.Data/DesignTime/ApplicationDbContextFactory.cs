@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AspireWeb.Data.DesignTime;
 
@@ -7,10 +9,16 @@ public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Ap
 {
     public ApplicationDbContext CreateDbContext(string[] args)
     {
+        // IdentityDbContext reads Stores.SchemaVersion from the application service provider,
+        // and Version3 (passkey-capable) must match the runtime configuration in the Web host.
+        var services = new ServiceCollection();
+        services.Configure<IdentityOptions>(options => options.Stores.SchemaVersion = IdentitySchemaVersions.Version3);
+
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(
                 DesignTimeConnection.ConnectionString,
                 npgsql => npgsql.MigrationsHistoryTable(ApplicationDbContext.MigrationsHistoryTableName))
+            .UseApplicationServiceProvider(services.BuildServiceProvider())
             .Options;
 
         return new ApplicationDbContext(options);

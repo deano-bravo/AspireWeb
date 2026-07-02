@@ -1,0 +1,15 @@
+# Project-scoped analyzer overrides for AspireWeb.Web only.
+#
+# Razor components compile through generated syntax trees that path-scoped .editorconfig
+# sections cannot reach, and these Sonar rules misfire on Razor/template code:
+#   S1075 - flags the otpauth:// URI format string in the Identity authenticator page
+#   S1144/S3459 - flag [SupplyParameterFromForm]-bound properties as unassigned/unused
+#   S2325/S6966 - style-level findings inside template-owned Account components
+# They stay fully enabled in every other project.
+is_global = true
+
+dotnet_diagnostic.S1075.severity = none
+dotnet_diagnostic.S1144.severity = none
+dotnet_diagnostic.S2325.severity = none
+dotnet_diagnostic.S3459.severity = none
+dotnet_diagnostic.S6966.severity = none

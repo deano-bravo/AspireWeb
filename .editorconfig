@@ -56,8 +56,11 @@ dotnet_diagnostic.MA0048.severity = none   # Aspire names the entry point AppHos
 # =====================================================================
 # Grafted ASP.NET Core Identity template code (AspireWeb.Web/Components/Account):
 # template-owned code must compile under -warnaserror; do not restyle it.
+# generated_code makes analyzers skip these files entirely — bulk severity alone
+# loses to the SDK's per-rule severity configuration.
 # =====================================================================
 [AspireWeb.Web/Components/Account/**.{cs,razor}]
+generated_code = true
 dotnet_analyzer_diagnostic.severity = silent
 dotnet_diagnostic.IDE0005.severity = silent
 dotnet_diagnostic.IDE0161.severity = silent
