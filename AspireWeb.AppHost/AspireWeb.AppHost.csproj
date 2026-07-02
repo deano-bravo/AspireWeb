@@ -2,9 +2,6 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net11.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <UserSecretsId>2e100eff-726f-49b7-8c98-563d1083213a</UserSecretsId>
   </PropertyGroup>
 
@@ -14,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aspire.Hosting.Kubernetes" Version="13.4.6-preview.1.26319.6" />
+    <PackageReference Include="Aspire.Hosting.Kubernetes" />
   </ItemGroup>
 
 </Project>

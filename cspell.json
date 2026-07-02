@@ -1,0 +1,26 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "apiservice",
+    "AppHost",
+    "aspireweb",
+    "Blazor",
+    "coverlet",
+    "csproj",
+    "dotnet",
+    "kubectl",
+    "Kubeadm",
+    "Kubernetes",
+    "kustomize",
+    "nuget",
+    "OpenApi",
+    "OpenTelemetry",
+    "pubxml",
+    "ServiceDefaults",
+    "slnx",
+    "warnaserror",
+    "webfrontend",
+    "xunit"
+  ]
+}
