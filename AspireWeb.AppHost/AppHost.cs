@@ -11,4 +11,4 @@ builder.AddProject<Projects.AspireWeb_Web>("webfrontend")
     .WithReference(apiService)
     .WaitFor(apiService);
 
-builder.Build().Run();
+await builder.Build().RunAsync();

@@ -29,4 +29,12 @@
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>
 
+  <!-- Roslyn analyzers, applied to every project (xunit.analyzers already flows
+       transitively into the test project via xunit.v3). -->
+  <ItemGroup Label="Analyzers">
+    <GlobalPackageReference Include="Meziantou.Analyzer" Version="3.0.117" />
+    <GlobalPackageReference Include="Roslynator.Analyzers" Version="4.15.0" />
+    <GlobalPackageReference Include="SonarAnalyzer.CSharp" Version="10.28.0.143324" />
+  </ItemGroup>
+
 </Project>
