@@ -1,18 +1,31 @@
 <Project>
-
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
-
   <ItemGroup>
     <!-- Aspire -->
     <PackageVersion Include="Aspire.Hosting.Kubernetes" Version="13.4.6-preview.1.26319.6" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
-
+    <PackageVersion Include="Aspire.Npgsql" Version="13.4.6" />
+    <!-- EF Core 11 preview: the Npgsql provider pins Microsoft.EntityFrameworkCore EXACTLY to
+         [11.0.0-preview.5.26302.115]; every EF-adjacent package (and the dotnet-ef local tool)
+         must move together on any bump. Regenerate (don't chain) migrations at RC/GA.
+         Deliberately NOT Aspire.Npgsql.EntityFrameworkCore.PostgreSQL — it is compiled against
+         the EF 10 provider; Aspire.Npgsql (ADO level) is the stable path. -->
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="11.0.0-preview.5" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="11.0.0-preview.5.26302.115" />
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="11.0.0-preview.5.26302.115" />
+    <PackageVersion Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="11.0.0-preview.5.26302.115" />
+    <PackageVersion Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="11.0.0-preview.5.26302.115" />
+    <!-- Auth: web-to-api tenant propagation via self-issued JWTs -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="11.0.0-preview.5.26302.115" />
+    <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.19.1" />
+    <!-- MigrationService worker -->
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
     <!-- API / OpenAPI (Microsoft.OpenApi pinned at 2.7.5 — 3.x breaks the source generator) -->
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
     <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
-
     <!-- ServiceDefaults: resilience, service discovery, OpenTelemetry -->
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.7.0" />
@@ -21,14 +34,12 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
-
     <!-- Test -->
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>
-
   <!-- Roslyn analyzers, applied to every project (xunit.analyzers already flows
        transitively into the test project via xunit.v3). -->
   <ItemGroup Label="Analyzers">
@@ -36,5 +47,4 @@
     <GlobalPackageReference Include="Roslynator.Analyzers" Version="4.15.0" />
     <GlobalPackageReference Include="SonarAnalyzer.CSharp" Version="10.28.0.143324" />
   </ItemGroup>
-
 </Project>

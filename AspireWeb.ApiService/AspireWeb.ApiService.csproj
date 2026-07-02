@@ -2,9 +2,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AspireWeb.ServiceDefaults\AspireWeb.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\AspireWeb.Data\AspireWeb.Data.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.OpenApi" />
   </ItemGroup>

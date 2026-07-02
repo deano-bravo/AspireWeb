@@ -8,10 +8,12 @@
   <ItemGroup>
     <ProjectReference Include="..\AspireWeb.ApiService\AspireWeb.ApiService.csproj" />
     <ProjectReference Include="..\AspireWeb.Web\AspireWeb.Web.csproj" />
+    <ProjectReference Include="..\AspireWeb.MigrationService\AspireWeb.MigrationService.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Kubernetes" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
   </ItemGroup>
 
 </Project>
