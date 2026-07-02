@@ -71,6 +71,10 @@ aspire-output/
 # Claude Code — personal, machine-local overrides (shared config lives in .claude/settings.json)
 .claude/settings.local.json
 
+# Local TLS material (self-signed dev certs — never commit private keys)
+k8s/.certs/
+*.pfx
+
 # Tye
 .tye/
 

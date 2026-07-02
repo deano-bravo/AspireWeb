@@ -1,0 +1,29 @@
+# HTTPS ingress for the web front end (TLS terminated at ingress-nginx with a self-signed cert).
+# The TLS secret `aspireweb-tls` is created out-of-band from a self-signed cert — see k8s/gen-cert.ps1
+# (the private key is never committed). Apply after the Helm deploy:
+#   kubectl apply -f k8s/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aspireweb-ingress
+  namespace: aspireweb
+  annotations:
+    # The app terminates plain HTTP inside the cluster; TLS is handled here.
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - localhost
+      secretName: aspireweb-tls
+  rules:
+    - host: localhost
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: webfrontend-service
+                port:
+                  number: 8080

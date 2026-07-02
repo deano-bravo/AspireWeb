@@ -1,0 +1,59 @@
+{
+  // ── Solution ────────────────────────────────────────────────────────────
+  "dotnet.defaultSolution": "AspireWeb.slnx",
+
+  // ── Editor ──────────────────────────────────────────────────────────────
+  "editor.formatOnSave": true,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.eol": "\n",
+
+  // ── Declutter the Explorer: nest required-at-root config under the solution ─
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    "AspireWeb.slnx": "global.json, nuget.config, aspire.config.json, Directory.Build.props, Directory.Packages.props, .gitignore, .gitattributes, .editorconfig, CLAUDE.md, README.md"
+  },
+  "search.exclude": {
+    "**/bin": true,
+    "**/obj": true,
+    "aspire-output": true,
+    "k8s/.certs": true
+  },
+
+  // ── Markdown lint: keep correctness rules, relax line-length for command docs ─
+  "markdownlint.config": {
+    "default": true,
+    "MD013": false
+  },
+
+  // ── Spelling (project dictionary lives here — no separate cspell.json) ──────
+  "cSpell.enabled": true,
+  "cSpell.words": [
+    "apiservice",
+    "AppHost",
+    "aspireweb",
+    "Blazor",
+    "coverlet",
+    "csproj",
+    "cygpath",
+    "dotnet",
+    "kubectl",
+    "Kubeadm",
+    "Kubernetes",
+    "kustomize",
+    "localtest",
+    "nginx",
+    "nuget",
+    "OpenApi",
+    "OpenTelemetry",
+    "PATHCONV",
+    "pubxml",
+    "ServiceDefaults",
+    "slnx",
+    "warnaserror",
+    "weatherforecast",
+    "webfrontend",
+    "xunit"
+  ]
+}

@@ -67,9 +67,26 @@ kubectl create namespace aspireweb
 helm upgrade --install aspireweb ./aspire-output -n aspireweb
 ```
 
-Verify: `kubectl get pods -n aspireweb` (expect all `Running`), then
-`kubectl port-forward -n aspireweb svc/webfrontend-service 8088:8080` and open
-<http://localhost:8088> — the `/weather` page must render data fetched from `apiservice`.
+### HTTPS access (self-signed cert via ingress)
+
+The front end is reached over HTTPS through an nginx ingress that terminates TLS with a self-signed
+cert; the app itself serves plain HTTP inside the cluster (`ASPNETCORE_FORWARDEDHEADERS_ENABLED`
+in the generated config makes `UseHttpsRedirection` honour the ingress `X-Forwarded-Proto`). Files
+live under [k8s/](k8s/): `ingress.yaml` (committed) and `gen-cert.sh` (creates the cert + the
+`aspireweb-tls` secret; the private key in `k8s/.certs/` is git-ignored). One-time per cluster:
+
+```powershell
+helm upgrade --install ingress-nginx ingress-nginx --repo https://kubernetes.github.io/ingress-nginx -n ingress-nginx --create-namespace
+```
+
+```bash
+./k8s/gen-cert.sh                 # self-signed cert + aspireweb-tls secret (Git Bash)
+kubectl apply -f k8s/ingress.yaml
+```
+
+Verify: `kubectl get pods -n aspireweb` (expect all `Running`), then open <https://localhost>
+(accept the self-signed warning) — the `/weather` page must render data fetched from `apiservice`.
+Plain-HTTP alternative: `kubectl port-forward -n aspireweb svc/webfrontend-service 8088:8080`.
 Teardown: `helm uninstall aspireweb -n aspireweb; kubectl delete ns aspireweb`.
 
 Notes: generated Helm services are **ClusterIP** (use port-forward, or patch to NodePort/LoadBalancer);
