@@ -1,0 +1,101 @@
+@page "/todos"
+@rendermode InteractiveServer
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization
+@using AspireWeb.ServiceDefaults
+
+@inject TodoApiClient TodoApi
+
+@* Deliberately NOT output-cached: this page renders per-tenant data. *@
+
+<PageTitle>Todos</PageTitle>
+
+<h1>Todos</h1>
+
+<p>These items belong to your organisation only — other tenants cannot see them.</p>
+
+@if (errorMessage is not null)
+{
+    <div class="alert alert-warning" role="alert">@errorMessage</div>
+}
+
+<div class="row mb-3">
+    <div class="col-md-6 d-flex gap-2">
+        <input class="form-control" placeholder="What needs doing?" @bind="newTitle" @bind:event="oninput" />
+        <button class="btn btn-primary" @onclick="AddTodoAsync" disabled="@string.IsNullOrWhiteSpace(newTitle)">Add</button>
+    </div>
+</div>
+
+@if (items is null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (items.Length == 0)
+{
+    <p><em>No todos yet — add the first one above.</em></p>
+}
+else
+{
+    <table class="table col-md-6">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Created</th>
+                <AuthorizeView Policy="@TenantPolicies.RequireTenantAdmin" Context="admin">
+                    <th></th>
+                </AuthorizeView>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in items)
+            {
+                <tr>
+                    <td>@item.Title</td>
+                    <td>@item.CreatedAt.LocalDateTime.ToString("g")</td>
+                    <AuthorizeView Policy="@TenantPolicies.RequireTenantAdmin" Context="admin">
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteTodoAsync(item.Id)">Delete</button>
+                        </td>
+                    </AuthorizeView>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private TodoItemDto[]? items;
+    private string newTitle = "";
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        items = await TodoApi.GetTodosAsync();
+    }
+
+    private async Task AddTodoAsync()
+    {
+        errorMessage = null;
+        var created = await TodoApi.CreateTodoAsync(newTitle.Trim());
+        if (created is null)
+        {
+            errorMessage = "A todo with that title already exists.";
+            return;
+        }
+
+        newTitle = "";
+        items = await TodoApi.GetTodosAsync();
+    }
+
+    private async Task DeleteTodoAsync(Guid id)
+    {
+        errorMessage = null;
+        if (!await TodoApi.DeleteTodoAsync(id))
+        {
+            errorMessage = "Only organisation admins or owners can delete todos.";
+            return;
+        }
+
+        items = await TodoApi.GetTodosAsync();
+    }
+}

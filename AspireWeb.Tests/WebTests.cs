@@ -16,6 +16,9 @@ public class WebTests
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AspireWeb_AppHost>(cancellationToken);
+        // Deterministic signing key so the AppHost's secret parameter resolves in tests
+        // (and so tests can mint their own tokens against the API).
+        appHost.Configuration["Parameters:jwt-signing-key"] = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=";
         appHost.Services.AddLogging(logging =>
         {
             logging.SetMinimumLevel(LogLevel.Debug);

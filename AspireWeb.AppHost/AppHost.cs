@@ -2,6 +2,10 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 builder.AddKubernetesEnvironment("k8s");
 
+// Symmetric key (base64, 32 bytes) for the web-to-api JWT. Local dev value comes from
+// user-secrets: dotnet user-secrets set Parameters:jwt-signing-key <key> --project AspireWeb.AppHost
+var jwtSigningKey = builder.AddParameter("jwt-signing-key", secret: true);
+
 var postgres = builder.AddPostgres("postgres");
 if (builder.ExecutionContext.IsPublishMode)
 {
@@ -22,7 +26,8 @@ var migrations = builder.AddProject<Projects.AspireWeb_MigrationService>("migrat
 var apiService = builder.AddProject<Projects.AspireWeb_ApiService>("apiservice")
     .WithHttpHealthCheck("/health")
     .WithReference(appdb)
-    .WaitForCompletion(migrations);
+    .WaitForCompletion(migrations)
+    .WithEnvironment("Auth__ApiJwt__SigningKey", jwtSigningKey);
 
 builder.AddProject<Projects.AspireWeb_Web>("webfrontend")
     .WithExternalHttpEndpoints()
@@ -30,6 +35,7 @@ builder.AddProject<Projects.AspireWeb_Web>("webfrontend")
     .WithReference(appdb)
     .WaitForCompletion(migrations)
     .WithReference(apiService)
-    .WaitFor(apiService);
+    .WaitFor(apiService)
+    .WithEnvironment("Auth__ApiJwt__SigningKey", jwtSigningKey);
 
 await builder.Build().RunAsync();

@@ -29,6 +29,13 @@ builder.Services.AddHttpClient<WeatherApiClient>(client =>
         client.BaseAddress = new("https+http://apiservice");
     });
 
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<TenantTokenService>();
+builder.Services.AddHttpClient<TodoApiClient>(client =>
+    {
+        client.BaseAddress = new("https+http://apiservice");
+    });
+
 // Identity (cookie auth) with the Blazor template's Account components.
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityRedirectManager>();
