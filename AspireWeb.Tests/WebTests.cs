@@ -1,46 +1,27 @@
-using Microsoft.Extensions.Logging;
-
 namespace AspireWeb.Tests;
 
-public class WebTests
+public class WebTests(AppFixture fixture)
 {
-    // Generous because startup now covers a Postgres image pull (cold Docker cache) plus the
-    // migration service running to completion; healthy runs don't pay this, it only bounds failures.
-    // These tests require a running Docker engine.
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(3);
-
     [Fact]
     public async Task GetWebResourceRootReturnsOkStatusCode()
     {
         // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-
-        var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AspireWeb_AppHost>(cancellationToken);
-        // Deterministic signing key so the AppHost's secret parameter resolves in tests
-        // (and so tests can mint their own tokens against the API).
-        appHost.Configuration["Parameters:jwt-signing-key"] = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=";
-        appHost.Services.AddLogging(logging =>
-        {
-            logging.SetMinimumLevel(LogLevel.Debug);
-            // Override the logging filters from the app's configuration
-            logging.AddFilter(appHost.Environment.ApplicationName, LogLevel.Debug);
-            logging.AddFilter("Aspire.", LogLevel.Debug);
-            // To output logs to the xUnit.net ITestOutputHelper, consider adding a package from https://www.nuget.org/packages?q=xunit+logging
-        });
-        appHost.Services.ConfigureHttpClientDefaults(clientBuilder =>
-        {
-            clientBuilder.AddStandardResilienceHandler();
-        });
-
-        await using var app = await appHost.BuildAsync(cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
-        await app.StartAsync(cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
+        using var httpClient = fixture.App.CreateHttpClient("webfrontend");
 
         // Act
-        var httpClient = app.CreateHttpClient("webfrontend");
-        await app.ResourceNotifications.WaitForResourceHealthyAsync("webfrontend", cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
-        var response = await httpClient.GetAsync("/", cancellationToken);
+        var response = await httpClient.GetAsync("/", TestContext.Current.CancellationToken);
 
         // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task WeatherApiRemainsAnonymous()
+    {
+        using var apiClient = fixture.App.CreateHttpClient("apiservice");
+
+        var response = await apiClient.GetAsync("/weatherforecast", TestContext.Current.CancellationToken);
+
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 }

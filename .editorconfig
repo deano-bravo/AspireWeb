@@ -45,6 +45,8 @@ dotnet_naming_style.underscore_camel.required_prefix = _
 
 # Rules that are wrong for ASP.NET Core apps, silenced by ID with a reason:
 dotnet_diagnostic.MA0004.severity = none   # ConfigureAwait(false) — no SynchronizationContext in ASP.NET Core
+dotnet_diagnostic.MA0006.severity = none   # string == is already ordinal in C#; String.Equals(Ordinal) adds noise
+dotnet_diagnostic.IDE0022.severity = none  # expression-bodied vs block method bodies: either style is fine
 
 # Aspire template conventions kept as-is:
 [AspireWeb.ServiceDefaults/Extensions.cs]
