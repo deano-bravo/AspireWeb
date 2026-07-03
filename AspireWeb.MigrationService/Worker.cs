@@ -4,12 +4,15 @@ using Microsoft.EntityFrameworkCore;
 namespace AspireWeb.MigrationService;
 
 /// <summary>
-/// Applies EF Core migrations for both contexts, then stops. The AppHost gates the
-/// web and API services on this resource via WaitForCompletion, so a failed migration
-/// (non-zero exit code) blocks startup instead of running against a stale schema.
+/// Applies EF Core migrations for both contexts. In Development (aspire run, tests) it then
+/// stops, so the AppHost's WaitForCompletion gates the web and API services on a completed
+/// migration; a failed migration exits non-zero and blocks startup. Outside Development
+/// (the generated Kubernetes chart renders this as a Deployment) it idles after migrating,
+/// because an exiting pod would restart-loop.
 /// </summary>
 public sealed partial class Worker(
     IServiceProvider serviceProvider,
+    IHostEnvironment environment,
     IHostApplicationLifetime lifetime,
     ILogger<Worker> logger) : BackgroundService
 {
@@ -29,9 +32,24 @@ public sealed partial class Worker(
         {
             LogMigrationFailed(logger, exception);
             Environment.ExitCode = 1;
+            lifetime.StopApplication();
+            return;
         }
 
-        lifetime.StopApplication();
+        if (environment.IsDevelopment())
+        {
+            lifetime.StopApplication();
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Normal shutdown.
+        }
     }
 
     private static async Task MigrateAsync<TContext>(IServiceProvider services, CancellationToken cancellationToken)
