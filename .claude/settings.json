@@ -1,5 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "DOTNET_NOLOGO": "1",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1"
+  },
   "permissions": {
     "allow": [
       "Bash(dotnet build:*)",
@@ -7,22 +11,84 @@
       "Bash(dotnet restore:*)",
       "Bash(dotnet publish:*)",
       "Bash(dotnet clean:*)",
+      "Bash(dotnet format:*)",
+      "Bash(dotnet tool restore)",
+      "Bash(dotnet user-secrets list:*)",
+      "Bash(dotnet ef migrations list:*)",
       "Bash(dotnet --info)",
       "Bash(dotnet --version)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git remote -v)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr checks:*)",
       "Bash(kubectl get:*)",
       "Bash(kubectl logs:*)",
       "Bash(kubectl describe:*)",
       "Bash(kubectl config current-context)",
       "Bash(helm list:*)",
-      "Bash(helm status:*)"
+      "Bash(helm status:*)",
+      "Bash(helm get:*)",
+      "PowerShell(dotnet build:*)",
+      "PowerShell(dotnet test:*)",
+      "PowerShell(dotnet restore:*)",
+      "PowerShell(dotnet publish:*)",
+      "PowerShell(dotnet clean:*)",
+      "PowerShell(dotnet format:*)",
+      "PowerShell(dotnet tool restore)",
+      "PowerShell(dotnet user-secrets list:*)",
+      "PowerShell(dotnet ef migrations list:*)",
+      "PowerShell(dotnet --info)",
+      "PowerShell(dotnet --version)",
+      "PowerShell(aspire publish:*)",
+      "PowerShell(gh run list:*)",
+      "PowerShell(gh run view:*)",
+      "PowerShell(kubectl get:*)",
+      "PowerShell(kubectl logs:*)",
+      "PowerShell(kubectl describe:*)",
+      "PowerShell(kubectl config current-context)",
+      "PowerShell(helm list:*)",
+      "PowerShell(helm status:*)",
+      "PowerShell(helm get:*)"
     ],
     "ask": [
       "Bash(git push:*)",
+      "Bash(dotnet ef database update:*)",
       "Bash(kubectl delete:*)",
-      "Bash(helm uninstall:*)"
+      "Bash(kubectl apply:*)",
+      "Bash(helm uninstall:*)",
+      "Bash(helm upgrade:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/guard-migrations.ps1"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/check-tenant-safety.ps1"
+          }
+        ]
+      }
     ]
   }
 }
