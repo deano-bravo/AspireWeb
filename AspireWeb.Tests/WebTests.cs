@@ -1,5 +1,7 @@
 namespace AspireWeb.Tests;
 
+[Collection(AppHostCollectionDefinition.Name)]
+[Trait(TestCategories.TraitName, TestCategories.Integration)]
 public class WebTests(AppFixture fixture)
 {
     [Fact]

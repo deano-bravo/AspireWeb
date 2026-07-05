@@ -5,11 +5,8 @@
 @using System.Text.Encodings.Web
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
-@using Microsoft.EntityFrameworkCore
-@using Npgsql
-@using AspireWeb.Data
 @using AspireWeb.Data.Entities
-@using AspireWeb.Data.Tenancy
+@using AspireWeb.Web.Identity
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
@@ -18,7 +15,7 @@
 @inject ILogger<Register> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
-@inject ApplicationDbContext DbContext
+@inject TenantProvisioningService Provisioning
 
 <PageTitle>Register</PageTitle>
 
@@ -97,52 +94,12 @@
         var emailStore = GetEmailStore();
         await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
 
-        // Tenant + owner are created atomically: a failed user creation must not leave an
-        // orphan tenant. The execution strategy wrapper is required because retries are enabled.
-        var strategy = DbContext.Database.CreateExecutionStrategy();
-        var registered = await strategy.ExecuteAsync(async () =>
+        // Tenant + owner are created atomically (see TenantProvisioningService): a failed
+        // user creation must not leave an orphan tenant.
+        var provisioning = await Provisioning.ProvisionTenantOwnerAsync(Input.OrganizationName, user, Input.Password);
+        if (!provisioning.Succeeded)
         {
-            DbContext.ChangeTracker.Clear(); // keep retried attempts idempotent
-
-            await using var transaction = await DbContext.Database.BeginTransactionAsync();
-
-            var tenant = new Tenant
-            {
-                Id = Guid.NewGuid(),
-                Name = Input.OrganizationName.Trim(),
-                Identifier = TenantSlug.Normalize(Input.OrganizationName),
-                CreatedAt = DateTimeOffset.UtcNow,
-            };
-            DbContext.Tenants.Add(tenant);
-            try
-            {
-                await DbContext.SaveChangesAsync();
-            }
-            catch (DbUpdateException exception)
-                when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-            {
-                // The unique index on Tenants.Identifier is the enforcement; this is just the friendly message.
-                identityErrors = [new IdentityError { Code = "DuplicateOrganization", Description = "That organisation name is already taken." }];
-                return false;
-            }
-
-            user.TenantId = tenant.Id;
-            user.TenantRole = TenantRole.Owner;
-
-            var result = await UserManager.CreateAsync(user, Input.Password);
-            if (!result.Succeeded)
-            {
-                await transaction.RollbackAsync();
-                identityErrors = result.Errors;
-                return false;
-            }
-
-            await transaction.CommitAsync();
-            return true;
-        });
-
-        if (!registered)
-        {
+            identityErrors = provisioning.Errors;
             return;
         }
 
@@ -205,7 +162,7 @@
         public string Email { get; set; } = "";
 
         [Required]
-        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [StringLength(PasswordPolicy.MaximumLength, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = PasswordPolicy.MinimumLength)]
         [DataType(DataType.Password)]
         [Display(Name = "Password")]
         public string Password { get; set; } = "";

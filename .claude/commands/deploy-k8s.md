@@ -30,11 +30,19 @@ Confirm the active kube context is `docker-desktop` before applying anything.
    ```
 
    Reuse the same `$PGPW` on upgrades — the Postgres PVC keeps the old password.
-5. Verify: `kubectl get pods -n aspireweb` (all `Running`; migrationservice logs show
-   "Database migrations applied" then it idles), then port-forward
-   `svc/webfrontend-service 8088:8080` and confirm `/weather` renders API data; for tenancy,
-   register an organisation and check `/todos`.
+5. HTTPS ingress (one-time per cluster/machine, skip if already installed):
+   - `helm upgrade --install ingress-nginx ingress-nginx --repo https://kubernetes.github.io/ingress-nginx -n ingress-nginx --create-namespace`
+   - `./k8s/gen-cert.sh` (Git Bash) — creates the local CA + `localhost` leaf cert + the
+     `aspireweb-tls` secret (CA/keys land in git-ignored `k8s/.certs/`).
+   - `powershell -File k8s/trust-ca.ps1` — trusts the CA in `CurrentUser\Root`; restart the browser.
+   - `kubectl apply -f k8s/ingress.yaml`
+6. Verify: `kubectl get pods -n aspireweb` (all `Running`; migrationservice logs show
+   "Database migrations applied" then it idles), then open <https://localhost> — no cert
+   warning; `/weather` renders API data; for tenancy, register an organisation and check `/todos`.
+   (`curl` in Git Bash uses its own CA bundle — verify trust with
+   `Invoke-WebRequest https://localhost/` in PowerShell.)
+   Plain-HTTP alternative: `kubectl port-forward -n aspireweb svc/webfrontend-service 8088:8080`.
 
-Report pod status and the port-forward URL. Remind the user of teardown:
+Report pod status and the URL used. Remind the user of teardown:
 `helm uninstall aspireweb -n aspireweb; kubectl delete ns aspireweb` — and that the
 postgres PVC survives uninstall and must be deleted explicitly.

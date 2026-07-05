@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AspireWeb.ServiceDefaults\AspireWeb.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\AspireWeb.Contracts\AspireWeb.Contracts.csproj" />
     <ProjectReference Include="..\AspireWeb.Data\AspireWeb.Data.csproj" />
   </ItemGroup>
 

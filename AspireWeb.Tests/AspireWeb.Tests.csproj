@@ -5,19 +5,17 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
-    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <!-- dotnet test runs these via the MTP runner opted into in global.json ("test" section);
+         Microsoft.NET.Test.Sdk + xunit.runner.visualstudio stay for Visual Studio compatibility. -->
   </PropertyGroup>
-
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Testing" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
-    <PackageReference Include="coverlet.collector">
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
     <PackageReference Include="xunit.runner.visualstudio">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -29,6 +27,9 @@
     <ProjectReference Include="..\AspireWeb.AppHost\AspireWeb.AppHost.csproj" />
     <ProjectReference Include="..\AspireWeb.Data\AspireWeb.Data.csproj" />
     <ProjectReference Include="..\AspireWeb.ServiceDefaults\AspireWeb.ServiceDefaults.csproj" />
+    <!-- Referenced to unit-test Web services (e.g. TenantTokenService) directly; the HTTP
+         surface is still exercised black-box through the AppHost. -->
+    <ProjectReference Include="..\AspireWeb.Web\AspireWeb.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>

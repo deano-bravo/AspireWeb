@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="AspireWeb.ApiService/AspireWeb.ApiService.csproj" />
   <Project Path="AspireWeb.AppHost/AspireWeb.AppHost.csproj" />
+  <Project Path="AspireWeb.Contracts/AspireWeb.Contracts.csproj" />
   <Project Path="AspireWeb.Data/AspireWeb.Data.csproj" />
   <Project Path="AspireWeb.MigrationService/AspireWeb.MigrationService.csproj" />
   <Project Path="AspireWeb.ServiceDefaults/AspireWeb.ServiceDefaults.csproj" />

@@ -2,6 +2,15 @@ namespace AspireWeb.Data.Entities;
 
 public sealed class TodoItem : ITenantOwned
 {
+    public const int TitleMaxLength = 256;
+
+    /// <summary>
+    /// Canonical normalization for <see cref="NormalizedTitle"/>. Every write path must
+    /// use this — the per-tenant unique index compares normalized values, so an
+    /// inconsistent normalization would silently defeat uniqueness.
+    /// </summary>
+    public static string NormalizeTitle(string title) => title.Trim().ToUpperInvariant();
+
     public Guid Id { get; set; }
 
     public Guid TenantId { get; set; }

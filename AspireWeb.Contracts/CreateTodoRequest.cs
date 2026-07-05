@@ -1,3 +1,3 @@
-namespace AspireWeb.ApiService.Contracts;
+namespace AspireWeb.Contracts;
 
 public sealed record CreateTodoRequest(string Title);

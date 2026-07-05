@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-fast-tests:
+    name: Build + fast tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      # global.json pins the exact preview SDK; setup-dotnet resolves it from the official
+      # CDN. If a pinned preview ever fails to resolve, fall back to:
+      #   curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --jsonfile global.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'global.json', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore AspireWeb.slnx
+
+      - name: Build (warnings as errors)
+        run: dotnet build AspireWeb.slnx -c Release --no-restore -warnaserror
+
+      # Docker-free tier: excludes the AppHost-backed integration collection.
+      # --minimum-expected-tests guards against a trait/filter typo silently selecting nothing.
+      - name: Fast tests
+        run: >
+          dotnet test --solution AspireWeb.slnx -c Release --no-build
+          --results-directory ./TestResults --minimum-expected-tests 10
+          -- --filter-not-trait Category=Integration --report-xunit-trx
+          --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fast-test-results
+          path: TestResults
+
+  integration-tests:
+    name: Integration tests (AppHost + Docker)
+    needs: build-and-fast-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'global.json', '**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore AspireWeb.slnx
+
+      - name: Build
+        run: dotnet build AspireWeb.slnx -c Release --no-restore
+
+      # Boots the full AppHost per collection fixture: Docker is preinstalled on
+      # ubuntu-latest; DCP + dashboard binaries ship via the Aspire NuGet packages.
+      # The fixture's 3-minute startup budget covers the cold postgres/pgweb image pulls.
+      - name: Integration tests
+        run: >
+          dotnet test --solution AspireWeb.slnx -c Release --no-build
+          --results-directory ./TestResults --minimum-expected-tests 8
+          -- --filter-trait Category=Integration --report-xunit-trx
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: TestResults

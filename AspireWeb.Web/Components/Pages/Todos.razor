@@ -68,34 +68,57 @@ else
     private string newTitle = "";
     private string? errorMessage;
 
-    protected override async Task OnInitializedAsync()
-    {
-        items = await TodoApi.GetTodosAsync();
-    }
+    protected override Task OnInitializedAsync() => RefreshAsync();
 
     private async Task AddTodoAsync()
     {
         errorMessage = null;
-        var created = await TodoApi.CreateTodoAsync(newTitle.Trim());
-        if (created is null)
+        var outcome = await TodoApi.CreateTodoAsync(newTitle.Trim());
+        if (outcome != TodoWriteOutcome.Success)
         {
-            errorMessage = "A todo with that title already exists.";
+            errorMessage = outcome switch
+            {
+                TodoWriteOutcome.DuplicateTitle => "A todo with that title already exists.",
+                TodoWriteOutcome.Forbidden => "You are not allowed to add todos.",
+                _ => "The todo could not be added — please try again.",
+            };
             return;
         }
 
         newTitle = "";
-        items = await TodoApi.GetTodosAsync();
+        await RefreshAsync();
     }
 
     private async Task DeleteTodoAsync(Guid id)
     {
         errorMessage = null;
-        if (!await TodoApi.DeleteTodoAsync(id))
+        var outcome = await TodoApi.DeleteTodoAsync(id);
+        switch (outcome)
         {
-            errorMessage = "Only organisation admins or owners can delete todos.";
-            return;
+            case TodoWriteOutcome.Forbidden:
+                errorMessage = "Only organisation admins or owners can delete todos.";
+                return;
+            case TodoWriteOutcome.Failed:
+                errorMessage = "The todo could not be deleted — please try again.";
+                return;
+            case TodoWriteOutcome.NotFound:
+                errorMessage = "That todo was already removed.";
+                break;
         }
 
-        items = await TodoApi.GetTodosAsync();
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        try
+        {
+            items = await TodoApi.GetTodosAsync();
+        }
+        catch (HttpRequestException)
+        {
+            items ??= [];
+            errorMessage = "The todo service is unavailable — refresh to retry.";
+        }
     }
 }

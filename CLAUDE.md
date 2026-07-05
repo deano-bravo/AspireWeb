@@ -7,8 +7,9 @@ Guidance for Claude Code (and other AI agents) working in this repository.
 **AspireWeb** is a .NET Aspire distributed application scaffolded as a **multi-tenant SaaS**:
 a Blazor Server front end with ASP.NET Core Identity (register / login / account profile,
 passkey-capable) that calls a minimal-API backend, PostgreSQL + EF Core with row-level
-tenant isolation, orchestrated by an Aspire AppHost with a shared ServiceDefaults library,
-a migration worker, and an integration test project.
+tenant isolation, orchestrated by an Aspire AppHost with shared ServiceDefaults and
+Contracts libraries, a migration worker, and a two-tier test project (fast unit tier +
+AppHost-backed integration tier).
 
 - **Stack:** .NET 11 (preview) · Aspire 13.4.6 · **EF Core 11 preview** · PostgreSQL ·
   C# with `Nullable` and `ImplicitUsings` enabled.
@@ -21,11 +22,12 @@ a migration worker, and an integration test project.
 | --- | --- | --- |
 | AppHost | [AspireWeb.AppHost/](AspireWeb.AppHost/) | Aspire orchestrator & entry point. Wires resources in [AppHost.cs](AspireWeb.AppHost/AppHost.cs). |
 | ApiService | [AspireWeb.ApiService/](AspireWeb.ApiService/) | Minimal-API backend. Anonymous `/weatherforecast`; tenant-scoped `/todos` behind JWT bearer auth. |
-| Web | [AspireWeb.Web/](AspireWeb.Web/) | Blazor Server front end. ASP.NET Core Identity (cookie auth, `Components/Account/**`), tenant-aware registration, calls the API via typed clients. |
-| Data | [AspireWeb.Data/](AspireWeb.Data/) | Entities, the two DbContexts, tenancy primitives, EF migrations, design-time factories. |
+| Web | [AspireWeb.Web/](AspireWeb.Web/) | Blazor Server front end. ASP.NET Core Identity (cookie auth, `Components/Account/**`), tenant-aware registration, calls the API via typed clients in `Clients/`. |
+| Contracts | [AspireWeb.Contracts/](AspireWeb.Contracts/) | Shared web↔api wire contracts (`TodoItemDto`, `CreateTodoRequest`, `WeatherForecast`). Deliberately dependency-free. |
+| Data | [AspireWeb.Data/](AspireWeb.Data/) | Entities, the two DbContexts (+ shared registration extensions `AddAppDbContext`/`AddIdentityDbContext`), tenancy primitives, EF migrations, design-time factories. |
 | MigrationService | [AspireWeb.MigrationService/](AspireWeb.MigrationService/) | Applies EF migrations for both contexts at startup; AppHost gates web/api on `WaitForCompletion`. |
 | ServiceDefaults | [AspireWeb.ServiceDefaults/](AspireWeb.ServiceDefaults/) | Shared OpenTelemetry, health checks, service discovery, HTTP resilience — plus the shared tenancy contract (`TenantClaimTypes`, `TenantPolicies`, `ApiJwtDefaults`, `AddTenantPolicies`). |
-| Tests | [AspireWeb.Tests/](AspireWeb.Tests/) | xUnit v3. Fast model/interceptor unit tests + integration tests over the full AppHost (shared `AppFixture`). |
+| Tests | [AspireWeb.Tests/](AspireWeb.Tests/) | xUnit v3 on the Microsoft.Testing.Platform runner. Fast unit tier (model/interceptor/token-service; no Docker) + `Category=Integration` tests over the full AppHost (`AppFixture` as a collection fixture — deliberately NOT an assembly fixture, which xunit creates eagerly even for filtered runs). References Web to unit-test its services. |
 
 **Topology** (see [AppHost.cs](AspireWeb.AppHost/AppHost.cs)): `postgres` (container; `appdb`
 database; pgweb UI in run mode; data volume only when publishing) → `migrationservice`
@@ -69,8 +71,19 @@ discovery** (`https+http://apiservice`) — never hardcode host/port.
 
 - Every service calls `builder.AddServiceDefaults()` and `app.MapDefaultEndpoints()`.
 - New service-to-service HTTP goes through service discovery + a typed `HttpClient`,
-  mirroring [TodoApiClient.cs](AspireWeb.Web/TodoApiClient.cs) (authenticated) or
-  [WeatherApiClient.cs](AspireWeb.Web/WeatherApiClient.cs) (anonymous) — do not hardcode URLs.
+  mirroring [TodoApiClient.cs](AspireWeb.Web/Clients/TodoApiClient.cs) (authenticated) or
+  [WeatherApiClient.cs](AspireWeb.Web/Clients/WeatherApiClient.cs) (anonymous) — do not hardcode URLs.
+- Wire DTOs shared by Web and ApiService live in
+  [AspireWeb.Contracts/](AspireWeb.Contracts/) — never duplicate a request/response shape
+  per project, and never post anonymous objects for a typed contract.
+- Hosts register DbContexts via the shared
+  [AddAppDbContext / AddIdentityDbContext](AspireWeb.Data/ServiceCollectionExtensions.cs)
+  extensions (history table, retry policy, tenancy interceptor, Identity schema-version pin
+  live there) — don't hand-roll `AddDbContext` blocks. Each host keeps its own
+  `builder.AddNpgsqlDataSource("appdb")`.
+- API endpoints live in `Endpoints/*.cs` modules (`MapXEndpoints()` extension per feature),
+  return RFC 7807 (`Results.Problem`/`ValidationProblem`) for every non-2xx, and declare
+  `.WithName`/`.Produces*` metadata — mirror [TodoEndpoints.cs](AspireWeb.ApiService/Endpoints/TodoEndpoints.cs).
 - New resources are added in [AppHost.cs](AspireWeb.AppHost/AppHost.cs) via
   `aspire add <integration>` + the corresponding `builder.Add*` call, then
   `WithReference`/`WaitFor` wired.
@@ -113,11 +126,16 @@ PowerShell. `clean`/`build`/`test` use `dotnet` (Aspire CLI covers restore/run/p
 ```powershell
 aspire run                                    # run locally with the Aspire dashboard
 dotnet build AspireWeb.slnx -c Release -warnaserror   # build, warnings are errors
-dotnet test  AspireWeb.slnx -c Release        # unit + integration tests (needs Docker)
+dotnet test --solution AspireWeb.slnx -c Release      # full suite: unit + integration (needs Docker)
+dotnet test --solution AspireWeb.slnx -c Release -- --filter-not-trait Category=Integration   # fast tier, no Docker, seconds
 aspire restore                                # restore + generate AppHost SDK code
 aspire doctor                                 # diagnose the Aspire/container environment
 dotnet tool restore                           # restores dotnet-ef (and aspire) local tools
 ```
+
+`dotnet test` runs through the **Microsoft.Testing.Platform** runner (opted in via the
+`"test"` section of [global.json](global.json)) — the solution goes after `--solution`
+(the old positional form errors), and MTP arguments go after `--`.
 
 MSBuild `/t:` switches get mangled by Git-Bash path conversion — use `-t:` or run in PowerShell.
 
@@ -148,64 +166,41 @@ Migrations are applied at runtime by the MigrationService (Identity context firs
 the `Tenants` table that `AppDbContext` FKs target; `AppDbContext` maps `Tenants` with
 `ExcludeFromMigrations`, so an App migration containing `CreateTable("Tenants")` is a bug).
 
+## Continuous integration
+
+[.github/workflows/ci.yml](.github/workflows/ci.yml) runs on pushes to `main` and on PRs,
+in two tiers: **build-and-fast-tests** (restore → `build -warnaserror` → the Docker-free
+tier with coverage as a Cobertura artifact) and **integration-tests** (the
+`Category=Integration` suite; ubuntu-latest ships Docker, and DCP comes from the Aspire
+NuGet packages — no Aspire CLI needed). `setup-dotnet` installs the exact preview SDK from
+`global.json`. Both jobs upload TRX results as artifacts. The `-warnaserror` gate and the
+tests are enforced here — locally they remain the pre-done checklist below.
+
 ## Deploy to local Kubernetes (Docker Desktop)
 
 The AppHost registers a Kubernetes compute environment (`builder.AddKubernetesEnvironment("k8s")`
 via the `Aspire.Hosting.Kubernetes` package). Deploy uses **local images + Helm, no registry**
-(Docker Desktop's containerd image store shares built images with its k8s node):
+(Docker Desktop's containerd image store shares built images with its k8s node).
 
-```powershell
-aspire publish -o ./aspire-output                    # generate the Helm chart
-dotnet publish AspireWeb.ApiService/AspireWeb.ApiService.csproj             -c Release -t:PublishContainer -p:ContainerRepository=apiservice       -p:ContainerImageTag=latest
-dotnet publish AspireWeb.Web/AspireWeb.Web.csproj                           -c Release -t:PublishContainer -p:ContainerRepository=webfrontend      -p:ContainerImageTag=latest
-dotnet publish AspireWeb.MigrationService/AspireWeb.MigrationService.csproj -c Release -t:PublishContainer -p:ContainerRepository=migrationservice -p:ContainerImageTag=latest
-kubectl create namespace aspireweb
-# Helm templates compose connection strings from these values; supply the same PG password
-# to all four consumers plus the JWT key to both services (exact keys: aspire-output/values.yaml):
-helm upgrade --install aspireweb ./aspire-output -n aspireweb `
-  --set secrets.postgres.postgres_password=$PGPW `
-  --set secrets.migrationservice.postgres_password=$PGPW `
-  --set secrets.apiservice.postgres_password=$PGPW `
-  --set secrets.webfrontend.postgres_password=$PGPW `
-  --set secrets.apiservice.jwt_signing_key=$JWTKEY `
-  --set secrets.webfrontend.jwt_signing_key=$JWTKEY
-```
+**The runnable recipe (chart generation, image builds, Helm secret values, HTTPS ingress,
+verification, teardown) lives in [.claude/commands/deploy-k8s.md](.claude/commands/deploy-k8s.md)
+(`/deploy-k8s`) — that file is the single source of truth for the commands; don't duplicate
+them here.** What matters architecturally:
 
-Notes: postgres renders as a StatefulSet; the data volume (publish mode only) becomes a PVC
-that **survives `helm uninstall`** — delete it explicitly on teardown. The migration worker
-renders as a Deployment, so outside Development it idles after migrating instead of exiting
-(an exiting pod would restart-loop). DataProtection keys live in the database, so cookies
-survive pod restarts.
-
-### HTTPS access (locally-trusted cert via ingress)
-
-The front end is reached over HTTPS through an nginx ingress that terminates TLS. A local root CA
-issues the `localhost` leaf cert; trusting that CA once means the browser shows **no warning**. The
-app itself serves plain HTTP inside the cluster (`ASPNETCORE_FORWARDEDHEADERS_ENABLED` in the
-generated config makes `UseHttpsRedirection` and the `Secure` auth cookie honour the ingress
-`X-Forwarded-Proto`). Files live under [k8s/](k8s/): `ingress.yaml` and `gen-cert.sh`/`trust-ca.ps1`
-(committed); the CA + keys in `k8s/.certs/` are git-ignored. One-time per cluster/machine:
-
-```powershell
-helm upgrade --install ingress-nginx ingress-nginx --repo https://kubernetes.github.io/ingress-nginx -n ingress-nginx --create-namespace
-```
-
-```bash
-./k8s/gen-cert.sh                        # CA + localhost cert + aspireweb-tls secret (Git Bash)
-powershell -File k8s/trust-ca.ps1        # trust the CA in CurrentUser\Root (then restart browser)
-kubectl apply -f k8s/ingress.yaml
-```
-
-Verify: `kubectl get pods -n aspireweb` (all `Running`), then open <https://localhost> — no cert
-warning; register an organisation, and the `/todos` page shows tenant-scoped data from
-`apiservice`. (`curl` from Git Bash uses its own CA bundle, so verify trust with
-`Invoke-WebRequest https://localhost/` in PowerShell instead.)
-Plain-HTTP alternative: `kubectl port-forward -n aspireweb svc/webfrontend-service 8088:8080`.
-Teardown: `helm uninstall aspireweb -n aspireweb; kubectl delete ns aspireweb` (+ PVC).
-
-Notes: generated Helm services are **ClusterIP** (use port-forward, or patch to NodePort/LoadBalancer);
-`aspire-output/` is generated and git-ignored. `aspire deploy` also exists but its pipeline includes
-an image **push** step that assumes a registry — the Helm path above is preferred for local dev.
+- postgres renders as a StatefulSet; the data volume (publish mode only) becomes a PVC that
+  **survives `helm uninstall`** — delete it explicitly on teardown.
+- The migration worker renders as a Deployment, so outside Development it idles after
+  migrating instead of exiting (an exiting pod would restart-loop).
+- DataProtection keys live in the database, so cookies survive pod restarts.
+- TLS terminates at an nginx ingress; the app serves plain HTTP in-cluster
+  (`ASPNETCORE_FORWARDEDHEADERS_ENABLED` in the generated config makes `UseHttpsRedirection`
+  and the `Secure` auth cookie honour `X-Forwarded-Proto`). A local root CA (git-ignored
+  under `k8s/.certs/`, created by `k8s/gen-cert.sh`, trusted once via `k8s/trust-ca.ps1`)
+  signs the `localhost` leaf, so the browser shows no warning.
+- Generated Helm services are **ClusterIP** (reach the app via the ingress or port-forward);
+  `aspire-output/` is generated and git-ignored. `aspire deploy` also exists but its pipeline
+  includes an image **push** step that assumes a registry — the Helm path is preferred for
+  local dev.
 
 ## Known tech debt
 
@@ -223,12 +218,27 @@ an image **push** step that assumes a registry — the Helm path above is prefer
   depth, not the security boundary.
 - DataProtection keys are stored unencrypted in the database — add `ProtectKeysWith*`
   when it matters.
+- `/health` and `/alive` are mapped in **all** environments (k8s probes need them), which
+  makes `webfrontend`'s `/health` reachable through the `/` ingress rule — and it runs the
+  Postgres check registered by `AddNpgsqlDataSource` (an unauthenticated DB round-trip).
+  Exclude it at the ingress or protect it before real production.
+- The generated Helm chart wires **no liveness/readiness probes** even though the health
+  endpoints exist — add probes (or an Aspire-side customization) when k8s self-healing matters.
+- `ActiveTenantGate` caches tenant-active checks in a per-instance `IMemoryCache`: with
+  multiple API replicas each pod ages out independently and there is no cross-pod
+  invalidation on deactivation. Swap to a distributed/HybridCache when replicas matter.
+- `Microsoft.Testing.Extensions.CodeCoverage` is pinned to **17.14.x**: the 18.x line forces
+  Microsoft.Testing.Platform 2.x, which breaks xunit.v3 3.2.2's MTP-v1 integration
+  (TypeLoadException at run start). Bump together with an xunit.v3 release that targets MTP v2.
 
 ## Verifying a change
 
 Before considering a change done: `dotnet build AspireWeb.slnx -c Release -warnaserror` **and**
-`dotnet test AspireWeb.slnx -c Release` must both pass (tests boot the AppHost and require a
-running **Docker** engine; first run pulls the Postgres image). For changes to runtime behavior,
-also run the app (`aspire run`, or deploy per above) and exercise the affected page/endpoint —
-for tenancy changes, register two organisations in two browser profiles and confirm `/todos`
-isolation plus `/debug/claims` (Development only) showing the tenant claims.
+`dotnet test --solution AspireWeb.slnx -c Release` must both pass (the integration tier boots
+the AppHost and requires a running **Docker** engine; first run pulls the Postgres image). For
+the inner loop, the fast tier
+(`dotnet test --solution AspireWeb.slnx -c Release -- --filter-not-trait Category=Integration`)
+runs in seconds without Docker — but the full suite gates "done". For changes to runtime
+behavior, also run the app (`aspire run`, or deploy per above) and exercise the affected
+page/endpoint — for tenancy changes, register two organisations in two browser profiles and
+confirm `/todos` isolation plus `/debug/claims` (Development only) showing the tenant claims.

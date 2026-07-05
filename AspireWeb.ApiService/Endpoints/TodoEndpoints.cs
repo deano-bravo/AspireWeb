@@ -1,5 +1,5 @@
-using AspireWeb.ApiService.Contracts;
 using AspireWeb.ApiService.Tenancy;
+using AspireWeb.Contracts;
 using AspireWeb.Data;
 using AspireWeb.Data.Entities;
 using AspireWeb.ServiceDefaults;
@@ -11,6 +11,9 @@ namespace AspireWeb.ApiService.Endpoints;
 
 public static class TodoEndpoints
 {
+    /// <summary>Scaffold cap on list size; replace with skip/take paging when the UI needs it.</summary>
+    private const int MaxListLength = 200;
+
     /// <summary>
     /// The tenant-scoped sample resource. Reads are isolated by AppDbContext's named
     /// "Tenant" query filter; writes are stamped/guarded by TenantSaveChangesInterceptor.
@@ -18,16 +21,25 @@ public static class TodoEndpoints
     public static IEndpointRouteBuilder MapTodoEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var todos = endpoints.MapGroup("/todos")
+            .WithTags("Todos")
             .RequireAuthorization(TenantPolicies.RequireTenant)
             .AddEndpointFilter<RequireActiveTenantFilter>();
 
         todos.MapGet("/", async (AppDbContext dbContext, CancellationToken cancellationToken) =>
-            await dbContext.TodoItems
-                .OrderBy(item => item.CreatedAt)
-                .Select(item => new TodoItemDto(item.Id, item.Title, item.CreatedAt))
-                .ToArrayAsync(cancellationToken));
+                await dbContext.TodoItems
+                    .OrderBy(item => item.CreatedAt)
+                    .ThenBy(item => item.Id)
+                    .Take(MaxListLength)
+                    .Select(item => new TodoItemDto(item.Id, item.Title, item.CreatedAt))
+                    .ToArrayAsync(cancellationToken))
+            .WithName("ListTodos")
+            .Produces<TodoItemDto[]>();
 
-        todos.MapPost("/", CreateTodoAsync);
+        todos.MapPost("/", CreateTodoAsync)
+            .WithName("CreateTodo")
+            .Produces<TodoItemDto>(StatusCodes.Status201Created)
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         // Query-filtered delete: another tenant's id simply isn't found. Global query
         // filters also apply to ExecuteDelete, so isolation holds without the interceptor.
@@ -38,6 +50,9 @@ public static class TodoEndpoints
                     .ExecuteDeleteAsync(cancellationToken);
                 return deleted == 0 ? Results.NotFound() : Results.NoContent();
             })
+            .WithName("DeleteTodo")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound)
             .RequireAuthorization(TenantPolicies.RequireTenantAdmin);
 
         return endpoints;
@@ -58,12 +73,20 @@ public static class TodoEndpoints
             });
         }
 
+        if (title.Length > TodoItem.TitleMaxLength)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["title"] = [$"Title must be at most {TodoItem.TitleMaxLength} characters."],
+            });
+        }
+
         var item = new TodoItem
         {
             Id = Guid.NewGuid(),
             // TenantId is stamped by TenantSaveChangesInterceptor from the token's tenant.
             Title = title,
-            NormalizedTitle = title.ToUpperInvariant(),
+            NormalizedTitle = TodoItem.NormalizeTitle(title),
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByUserId = httpContext.User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value,
         };
@@ -76,7 +99,10 @@ public static class TodoEndpoints
         catch (DbUpdateException exception)
             when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
-            return Results.Conflict(new { error = "A todo with that title already exists." });
+            // RFC 7807 like every other non-2xx from this API (AddProblemDetails is registered).
+            return Results.Problem(
+                title: "A todo with that title already exists.",
+                statusCode: StatusCodes.Status409Conflict);
         }
 
         return Results.Created($"/todos/{item.Id}", new TodoItemDto(item.Id, item.Title, item.CreatedAt));

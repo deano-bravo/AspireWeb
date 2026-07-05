@@ -1,4 +1,4 @@
-namespace AspireWeb.ApiService;
+namespace AspireWeb.Contracts;
 
 public sealed record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {

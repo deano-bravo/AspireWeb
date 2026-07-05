@@ -22,8 +22,11 @@ public sealed class TenantTokenService(
     private string? _cachedToken;
     private DateTimeOffset _expiresAt;
 
-    public async Task<string> GetTokenAsync()
+    public async Task<string> GetTokenAsync(CancellationToken cancellationToken = default)
     {
+        // Minting is CPU-only (no I/O to cancel), so honour cancellation up front.
+        cancellationToken.ThrowIfCancellationRequested();
+
         var now = timeProvider.GetUtcNow();
         if (_cachedToken is not null && now < _expiresAt - RenewalSkew)
         {
@@ -36,10 +39,7 @@ public sealed class TenantTokenService(
         string userId = user.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("The current user has no id claim — sign in first.");
 
-        string signingKey = configuration[ApiJwtDefaults.SigningKeyConfigurationKey]
-            ?? throw new InvalidOperationException(
-                $"Configuration '{ApiJwtDefaults.SigningKeyConfigurationKey}' is required. " +
-                "Provide the AppHost 'jwt-signing-key' secret parameter.");
+        byte[] signingKeyBytes = ApiJwtDefaults.GetSigningKeyBytes(configuration);
 
         var descriptor = new SecurityTokenDescriptor
         {
@@ -55,7 +55,7 @@ public sealed class TenantTokenService(
                     user.FindFirstValue(TenantClaimTypes.TenantRole) ?? TenantRoleNames.Member,
             },
             SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Convert.FromBase64String(signingKey)),
+                new SymmetricSecurityKey(signingKeyBytes),
                 SecurityAlgorithms.HmacSha256),
         };
 

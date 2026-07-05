@@ -30,12 +30,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Owned by ApplicationDbContext's migrations; mapped here only for queries + FK integrity.
-        modelBuilder.Entity<Tenant>().ToTable("Tenants", t => t.ExcludeFromMigrations());
+        modelBuilder.Entity<Tenant>().ToTable(Tenant.TableName, t => t.ExcludeFromMigrations());
 
         modelBuilder.Entity<TodoItem>(item =>
         {
-            item.Property(i => i.Title).HasMaxLength(256);
-            item.Property(i => i.NormalizedTitle).HasMaxLength(256);
+            item.Property(i => i.Title).HasMaxLength(TodoItem.TitleMaxLength);
+            item.Property(i => i.NormalizedTitle).HasMaxLength(TodoItem.TitleMaxLength);
             item.HasOne<Tenant>().WithMany().HasForeignKey(i => i.TenantId);
             item.HasIndex(i => new { i.TenantId, i.NormalizedTitle }).IsUnique();
         });
@@ -59,8 +59,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
                     Expression.Property(Expression.Constant(this), nameof(CurrentTenantId))),
                 entity);
 
-            modelBuilder.Entity(clrType).HasQueryFilter(TenantFilterName, filter);
-            modelBuilder.Entity(clrType).HasIndex(nameof(ITenantOwned.TenantId));
+            var entityBuilder = modelBuilder.Entity(clrType);
+            entityBuilder.HasQueryFilter(TenantFilterName, filter);
+
+            // Every tenant filter needs an index that leads on TenantId, but an extra
+            // single-column index next to one that already leads on it (e.g. TodoItem's
+            // composite unique index) only adds write cost.
+            bool covered = entityBuilder.Metadata.GetIndexes()
+                .Any(index => index.Properties[0].Name == nameof(ITenantOwned.TenantId));
+            if (!covered)
+            {
+                entityBuilder.HasIndex(nameof(ITenantOwned.TenantId));
+            }
         }
     }
 }

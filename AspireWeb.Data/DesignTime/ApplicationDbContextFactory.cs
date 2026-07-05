@@ -10,9 +10,9 @@ public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Ap
     public ApplicationDbContext CreateDbContext(string[] args)
     {
         // IdentityDbContext reads Stores.SchemaVersion from the application service provider,
-        // and Version3 (passkey-capable) must match the runtime configuration in the Web host.
+        // and the shared schema version must match the runtime configuration in the Web host.
         var services = new ServiceCollection();
-        services.Configure<IdentityOptions>(options => options.Stores.SchemaVersion = IdentitySchemaVersions.Version3);
+        services.Configure<IdentityOptions>(options => options.Stores.SchemaVersion = AppIdentityDefaults.StoreSchemaVersion);
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(

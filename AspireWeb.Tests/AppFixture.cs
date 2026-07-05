@@ -1,3 +1,5 @@
+using System.Net.Http.Headers;
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Aspire.Hosting;
 using AspireWeb.ServiceDefaults;
@@ -5,19 +7,20 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
-[assembly: AssemblyFixture(typeof(AspireWeb.Tests.AppFixture))]
-
 namespace AspireWeb.Tests;
 
 /// <summary>
-/// Boots the full AppHost (Postgres container + migrations + services) once per test
-/// assembly. Requires a running Docker engine; startup is bounded by
-/// <see cref="StartupTimeout"/> to cover a cold Postgres image pull.
+/// Boots the full AppHost (Postgres container + migrations + services) once for the
+/// <see cref="AppHostCollectionDefinition"/> collection. Requires a running Docker engine;
+/// startup is bounded by <see cref="StartupTimeout"/> to cover a cold Postgres image pull.
 /// </summary>
 public sealed partial class AppFixture : IAsyncLifetime
 {
     /// <summary>Deterministic signing key so tests can mint their own API tokens.</summary>
     public const string JwtSigningKey = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=";
+
+    /// <summary>Meets the server password policy (PasswordPolicy.MinimumLength).</summary>
+    public const string DefaultPassword = "Sup3r-Secret-Pass!42";
 
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(3);
 
@@ -105,6 +108,33 @@ public sealed partial class AppFixture : IAsyncLifetime
         Assert.NotNull(claims);
         return claims;
     }
+
+    /// <summary>Registers a fresh organisation + owner and returns their ids from the claims.</summary>
+    public async Task<(Guid TenantId, string UserId)> RegisterTenantAsync(
+        string prefix, CancellationToken cancellationToken)
+    {
+        using var client = CreateWebClientWithCookies();
+        var claims = await RegisterAsync(
+            client, UniqueOrganization(prefix), $"{prefix}-{Guid.NewGuid():N}@example.com",
+            DefaultPassword, cancellationToken);
+
+        var tenantId = Guid.Parse(GetClaim(claims, TenantClaimTypes.TenantId)!);
+        string userId = GetClaim(claims, ClaimTypes.NameIdentifier)!;
+        return (tenantId, userId);
+    }
+
+    /// <summary>A bearer-authenticated request for the API service.</summary>
+    public static HttpRequestMessage ApiRequest(HttpMethod method, string uri, string token)
+    {
+        var request = new HttpRequestMessage(method, uri);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return request;
+    }
+
+    public static string? GetClaim(IReadOnlyList<TestClaim> claims, string type) =>
+        claims.FirstOrDefault(claim => claim.Type == type)?.Value;
+
+    public static string UniqueOrganization(string prefix) => $"{prefix} {Guid.NewGuid():N}";
 
     /// <summary>Mints an API token the way the web front end does (or a forged/partial one).</summary>
     public static string MintJwt(

@@ -1,15 +1,14 @@
 using System.Security.Claims;
 using AspireWeb.Data;
 using AspireWeb.Data.Entities;
-using AspireWeb.Web;
+using AspireWeb.ServiceDefaults;
+using AspireWeb.Web.Clients;
 using AspireWeb.Web.Components;
 using AspireWeb.Web.Components.Account;
 using AspireWeb.Web.Identity;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,25 +21,30 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddOutputCache();
 
+// This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
+// Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
+const string apiServiceUrl = "https+http://apiservice";
+
 builder.Services.AddHttpClient<WeatherApiClient>(client =>
     {
-        // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
-        // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
-        client.BaseAddress = new("https+http://apiservice");
+        client.BaseAddress = new(apiServiceUrl);
     });
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<TenantTokenService>();
+builder.Services.AddScoped<TenantProvisioningService>();
 builder.Services.AddHttpClient<TodoApiClient>(client =>
     {
-        client.BaseAddress = new("https+http://apiservice");
+        client.BaseAddress = new(apiServiceUrl);
     });
 
 // Identity (cookie auth) with the Blazor template's Account components.
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
-builder.Services.AddAuthorization();
+// Registers the shared tenant policies (AuthorizeView on /todos resolves RequireTenantAdmin
+// by name — an unregistered policy throws at render time). Includes AddAuthorization().
+builder.Services.AddTenantPolicies();
 
 builder.Services.AddAuthentication(options =>
     {
@@ -50,19 +54,16 @@ builder.Services.AddAuthentication(options =>
     .AddIdentityCookies();
 
 builder.AddNpgsqlDataSource("appdb");
-builder.Services.AddDbContext<ApplicationDbContext>((provider, options) =>
-    options.UseNpgsql(provider.GetRequiredService<NpgsqlDataSource>(), npgsql =>
-        npgsql.MigrationsHistoryTable(ApplicationDbContext.MigrationsHistoryTableName)
-            .EnableRetryOnFailure()));
+builder.Services.AddIdentityDbContext();
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
         // Dev scaffold: flip to true (with a real IEmailSender) for production.
+        // Stores.SchemaVersion is owned by AddIdentityDbContext — do not set it here.
         options.SignIn.RequireConfirmedAccount = false;
-        options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
-        // NIST-style password policy: length over composition rules.
-        options.Password.RequiredLength = 12;
+        // NIST-style password policy: length over composition rules (shared with the Register form).
+        options.Password.RequiredLength = PasswordPolicy.MinimumLength;
         options.Password.RequireNonAlphanumeric = false;
         options.Password.RequireUppercase = false;
         options.Password.RequireLowercase = false;
@@ -90,9 +91,9 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 // Tenant/role mutations bump the user's security stamp; cookies and circuits revalidate
-// within this interval (IdentityRevalidatingAuthenticationStateProvider matches it).
+// within this shared interval (IdentityRevalidatingAuthenticationStateProvider reads the same value).
 builder.Services.Configure<SecurityStampValidatorOptions>(options =>
-    options.ValidationInterval = TimeSpan.FromMinutes(5));
+    options.ValidationInterval = SecurityStampDefaults.ValidationInterval);
 
 // Cookies and antiforgery tokens survive pod restarts/replicas: keys live in the database.
 // Production note: keys are stored unencrypted; add ProtectKeysWith* + a cert when it matters.

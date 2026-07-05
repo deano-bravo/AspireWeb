@@ -92,22 +92,24 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // Adding health checks endpoints to applications in non-development environments has security implications.
-        // See https://aka.ms/dotnet/aspire/healthchecks for details before enabling these endpoints in non-development environments.
-        if (app.Environment.IsDevelopment())
+        // Mapped in every environment: Kubernetes probes need these outside Development
+        // (the generated chart has no other signal). apiservice/migrationservice are
+        // ClusterIP-internal; webfrontend's /health IS reachable through the "/" ingress
+        // rule and includes the Postgres check registered by AddNpgsqlDataSource — exclude
+        // it at the ingress or protect it before real production (see CLAUDE.md tech debt,
+        // and https://aka.ms/dotnet/aspire/healthchecks for the general guidance).
+
+        // AllowAnonymous keeps these reachable in services that set an authenticated-user
+        // fallback authorization policy (e.g. the API service).
+
+        // All health checks must pass for app to be considered ready to accept traffic after starting
+        app.MapHealthChecks(HealthEndpointPath).AllowAnonymous();
+
+        // Only health checks tagged with the "live" tag must pass for app to be considered alive
+        app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
         {
-            // AllowAnonymous keeps these reachable in services that set an authenticated-user
-            // fallback authorization policy (e.g. the API service).
-
-            // All health checks must pass for app to be considered ready to accept traffic after starting
-            app.MapHealthChecks(HealthEndpointPath).AllowAnonymous();
-
-            // Only health checks tagged with the "live" tag must pass for app to be considered alive
-            app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
-            {
-                Predicate = r => r.Tags.Contains("live")
-            }).AllowAnonymous();
-        }
+            Predicate = r => r.Tags.Contains("live")
+        }).AllowAnonymous();
 
         return app;
     }

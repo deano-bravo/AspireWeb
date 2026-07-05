@@ -6,19 +6,20 @@ using Microsoft.AspNetCore.Components.Server;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using AspireWeb.Data.Entities;
+using AspireWeb.Web.Identity;
 
 namespace AspireWeb.Web.Components.Account;
 
-// This is a server-side AuthenticationStateProvider that revalidates the security stamp for the connected user
-// every 5 minutes an interactive circuit is connected (kept in sync with SecurityStampValidatorOptions
-// so tenant/role changes propagate to long-lived circuits within the same bound).
+// This is a server-side AuthenticationStateProvider that revalidates the security stamp for the
+// connected user on the shared SecurityStampDefaults interval (same bound as
+// SecurityStampValidatorOptions, so tenant/role changes propagate to long-lived circuits too).
 internal sealed class IdentityRevalidatingAuthenticationStateProvider(
         ILoggerFactory loggerFactory,
         IServiceScopeFactory scopeFactory,
         IOptions<IdentityOptions> options)
     : RevalidatingServerAuthenticationStateProvider(loggerFactory)
 {
-    protected override TimeSpan RevalidationInterval => TimeSpan.FromMinutes(5);
+    protected override TimeSpan RevalidationInterval => SecurityStampDefaults.ValidationInterval;
 
     protected override async Task<bool> ValidateAuthenticationStateAsync(
         AuthenticationState authenticationState, CancellationToken cancellationToken)

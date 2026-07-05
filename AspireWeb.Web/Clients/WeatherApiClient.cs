@@ -1,6 +1,8 @@
-namespace AspireWeb.Web;
+using AspireWeb.Contracts;
 
-public class WeatherApiClient(HttpClient httpClient)
+namespace AspireWeb.Web.Clients;
+
+public sealed class WeatherApiClient(HttpClient httpClient)
 {
     public async Task<WeatherForecast[]> GetWeatherAsync(int maxItems = 10, CancellationToken cancellationToken = default)
     {

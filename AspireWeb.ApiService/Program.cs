@@ -1,4 +1,3 @@
-using AspireWeb.ApiService;
 using AspireWeb.ApiService.Endpoints;
 using AspireWeb.ApiService.Tenancy;
 using AspireWeb.Data;
@@ -6,9 +5,7 @@ using AspireWeb.Data.Tenancy;
 using AspireWeb.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,19 +24,11 @@ builder.AddNpgsqlDataSource("appdb");
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<ITenantContext, ClaimsTenantContext>();
-builder.Services.AddScoped<TenantSaveChangesInterceptor>();
 builder.Services.AddScoped<ActiveTenantGate>();
-builder.Services.AddDbContext<AppDbContext>((provider, options) =>
-    options.UseNpgsql(provider.GetRequiredService<NpgsqlDataSource>(), npgsql =>
-            npgsql.MigrationsHistoryTable(AppDbContext.MigrationsHistoryTableName)
-                .EnableRetryOnFailure())
-        .AddInterceptors(provider.GetRequiredService<TenantSaveChangesInterceptor>()));
+builder.Services.AddAppDbContext();
 
 // Bearer auth for the self-issued web-to-api JWT (see ApiJwtDefaults for the contract).
-string signingKey = builder.Configuration[ApiJwtDefaults.SigningKeyConfigurationKey]
-    ?? throw new InvalidOperationException(
-        $"Configuration '{ApiJwtDefaults.SigningKeyConfigurationKey}' is required. " +
-        "Provide the AppHost 'jwt-signing-key' secret parameter (dotnet user-secrets on the AppHost project).");
+byte[] signingKeyBytes = ApiJwtDefaults.GetSigningKeyBytes(builder.Configuration);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -52,7 +41,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             ValidIssuer = ApiJwtDefaults.Issuer,
             ValidAudience = ApiJwtDefaults.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Convert.FromBase64String(signingKey)),
+            IssuerSigningKey = new SymmetricSecurityKey(signingKeyBytes),
             ClockSkew = ApiJwtDefaults.ClockSkew,
         };
     });
@@ -72,26 +61,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi().AllowAnonymous();
 }
 
-string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
-
 app.MapGet("/", () => "API service is running. Navigate to /weatherforecast to see sample data.")
     .AllowAnonymous();
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.AllowAnonymous();
-
+app.MapWeatherEndpoints();
 app.MapTodoEndpoints();
 
 app.MapDefaultEndpoints();

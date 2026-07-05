@@ -34,10 +34,16 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
-    <!-- Test -->
-    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <!-- Test (Microsoft.Testing.Platform runner; coverage via the MTP extension — the old
+         coverlet.collector was a VSTest data collector and a no-op under MTP) -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="11.0.0-preview.5.26302.115" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.7.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
+    <!-- CodeCoverage stays on 17.14.x: 18.x forces Microsoft.Testing.Platform 2.x, but
+         xunit.v3 3.2.2 ships the MTP v1 integration (xunit.v3.mtp-v1 / MSBuild 1.9.x) and
+         fails with a TypeLoadException on the 2.x platform. Bump alongside an xunit.v3
+         release that moves to MTP v2. -->
+    <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="17.14.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>

@@ -24,7 +24,7 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
 
         builder.Entity<Tenant>(tenant =>
         {
-            tenant.ToTable("Tenants");
+            tenant.ToTable(Tenant.TableName);
             tenant.Property(t => t.Identifier).HasMaxLength(64);
             tenant.Property(t => t.Name).HasMaxLength(128);
             tenant.HasIndex(t => t.Identifier).IsUnique();
