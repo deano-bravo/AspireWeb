@@ -15,8 +15,9 @@ Confirm the active kube context is `docker-desktop` before applying anything.
    (Use PowerShell or `-t:` form — Git-Bash mangles `/t:`.)
 3. `kubectl create namespace aspireweb` (ignore "already exists").
 4. Install with the required secret values (Helm composes the Postgres connection strings from
-   them; exact key names are in `aspire-output/values.yaml`). Generate `$PGPW` (any strong
-   password) and `$JWTKEY` (base64 of 32 random bytes — reuse the value from
+   them; exact key names are in `aspire-output/values.yaml`). Generate `$PGPW` (strong but
+   **alphanumeric** — it is embedded raw in Helm-templated connection strings and a
+   `postgresql://` URI) and `$JWTKEY` (base64 of 32 random bytes — reuse the value from
    `dotnet user-secrets list --project AspireWeb.AppHost` if set):
 
    ```powershell
@@ -46,3 +47,19 @@ Confirm the active kube context is `docker-desktop` before applying anything.
 Report pod status and the URL used. Remind the user of teardown:
 `helm uninstall aspireweb -n aspireweb; kubectl delete ns aspireweb` — and that the
 postgres PVC survives uninstall and must be deleted explicitly.
+
+## Architecture notes
+
+- postgres renders as a StatefulSet; its data volume (publish mode only) becomes a PVC that
+  **survives `helm uninstall`** — delete it explicitly on teardown.
+- The migration worker renders as a Deployment, so outside Development it idles after
+  migrating instead of exiting (an exiting pod would restart-loop).
+- DataProtection keys live in the database, so cookies survive pod restarts.
+- TLS terminates at the nginx ingress; the app serves plain HTTP in-cluster —
+  `ASPNETCORE_FORWARDEDHEADERS_ENABLED` in the generated config makes `UseHttpsRedirection`
+  and the `Secure` auth cookie honour `X-Forwarded-Proto`.
+- Generated Helm services are **ClusterIP** (reach the app via the ingress or port-forward);
+  the chart wires **no liveness/readiness probes** (known tech debt).
+- `aspire-output/` is generated and git-ignored. `aspire deploy` is deliberately not used —
+  its pipeline includes an image push that assumes a registry; this local-image Helm path
+  works because Docker Desktop's containerd image store shares built images with its k8s node.
