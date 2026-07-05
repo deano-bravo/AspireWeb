@@ -5,7 +5,6 @@ using AspireWeb.Data.Entities;
 using AspireWeb.ServiceDefaults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.JsonWebTokens;
-using Npgsql;
 
 namespace AspireWeb.ApiService.Endpoints;
 
@@ -15,7 +14,7 @@ public static class TodoEndpoints
     private const int MaxListLength = 200;
 
     /// <summary>
-    /// The tenant-scoped sample resource. Reads are isolated by AppDbContext's named
+    /// The tenant-scoped sample resource. Reads are isolated by TenantDbContext's named
     /// "Tenant" query filter; writes are stamped/guarded by TenantSaveChangesInterceptor.
     /// </summary>
     public static IEndpointRouteBuilder MapTodoEndpoints(this IEndpointRouteBuilder endpoints)
@@ -25,13 +24,7 @@ public static class TodoEndpoints
             .RequireAuthorization(TenantPolicies.RequireTenant)
             .AddEndpointFilter<RequireActiveTenantFilter>();
 
-        todos.MapGet("/", async (AppDbContext dbContext, CancellationToken cancellationToken) =>
-                await dbContext.TodoItems
-                    .OrderBy(item => item.CreatedAt)
-                    .ThenBy(item => item.Id)
-                    .Take(MaxListLength)
-                    .Select(item => new TodoItemDto(item.Id, item.Title, item.CreatedAt))
-                    .ToArrayAsync(cancellationToken))
+        todos.MapGet("/", ListTodosAsync)
             .WithName("ListTodos")
             .Produces<TodoItemDto[]>();
 
@@ -43,13 +36,7 @@ public static class TodoEndpoints
 
         // Query-filtered delete: another tenant's id simply isn't found. Global query
         // filters also apply to ExecuteDelete, so isolation holds without the interceptor.
-        todos.MapDelete("/{id:guid}", async (Guid id, AppDbContext dbContext, CancellationToken cancellationToken) =>
-            {
-                int deleted = await dbContext.TodoItems
-                    .Where(item => item.Id == id)
-                    .ExecuteDeleteAsync(cancellationToken);
-                return deleted == 0 ? Results.NotFound() : Results.NoContent();
-            })
+        todos.MapDelete("/{id:guid}", DeleteTodoAsync)
             .WithName("DeleteTodo")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound)
@@ -58,27 +45,39 @@ public static class TodoEndpoints
         return endpoints;
     }
 
+    private static async Task<TodoItemDto[]> ListTodosAsync(
+        TenantDbContext dbContext, CancellationToken cancellationToken) =>
+        await dbContext.TodoItems
+            .OrderBy(item => item.CreatedAt)
+            .ThenBy(item => item.Id)
+            .Take(MaxListLength)
+            .Select(item => new TodoItemDto(item.Id, item.Title, item.CreatedAt))
+            .ToArrayAsync(cancellationToken);
+
+    private static async Task<IResult> DeleteTodoAsync(
+        Guid id, TenantDbContext dbContext, CancellationToken cancellationToken)
+    {
+        int deleted = await dbContext.TodoItems
+            .Where(item => item.Id == id)
+            .ExecuteDeleteAsync(cancellationToken);
+        return deleted == 0 ? Results.NotFound() : Results.NoContent();
+    }
+
     private static async Task<IResult> CreateTodoAsync(
         CreateTodoRequest request,
-        AppDbContext dbContext,
+        TenantDbContext dbContext,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         string title = request.Title?.Trim() ?? "";
         if (title.Length == 0)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>(StringComparer.Ordinal)
-            {
-                ["title"] = ["Title is required."],
-            });
+            return TitleProblem("Title is required.");
         }
 
         if (title.Length > TodoItem.TitleMaxLength)
         {
-            return Results.ValidationProblem(new Dictionary<string, string[]>(StringComparer.Ordinal)
-            {
-                ["title"] = [$"Title must be at most {TodoItem.TitleMaxLength} characters."],
-            });
+            return TitleProblem($"Title must be at most {TodoItem.TitleMaxLength} characters.");
         }
 
         var item = new TodoItem
@@ -96,8 +95,7 @@ public static class TodoEndpoints
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException exception)
-            when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        catch (DbUpdateException exception) when (PostgresErrors.IsUniqueViolation(exception))
         {
             // RFC 7807 like every other non-2xx from this API (AddProblemDetails is registered).
             return Results.Problem(
@@ -107,4 +105,10 @@ public static class TodoEndpoints
 
         return Results.Created($"/todos/{item.Id}", new TodoItemDto(item.Id, item.Title, item.CreatedAt));
     }
+
+    private static IResult TitleProblem(string message) =>
+        Results.ValidationProblem(new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["title"] = [message],
+        });
 }

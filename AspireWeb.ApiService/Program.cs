@@ -5,7 +5,6 @@ using AspireWeb.Data.Tenancy;
 using AspireWeb.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,12 +19,12 @@ builder.Services.AddOpenApi();
 
 // Tenant-scoped data access: tenant resolved from the validated JWT, reads isolated by
 // the named query filter, writes stamped/guarded by the interceptor.
-builder.AddNpgsqlDataSource("appdb");
+builder.AddNpgsqlDataSource(DatabaseNames.AppDatabase);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<ITenantContext, ClaimsTenantContext>();
 builder.Services.AddScoped<ActiveTenantGate>();
-builder.Services.AddAppDbContext();
+builder.Services.AddTenantDbContext();
 
 // Bearer auth for the self-issued web-to-api JWT (see ApiJwtDefaults for the contract).
 byte[] signingKeyBytes = ApiJwtDefaults.GetSigningKeyBytes(builder.Configuration);
@@ -37,13 +36,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.MapInboundClaims = false;
         // Tokens are validated by key; there is no metadata endpoint, and in-cluster traffic is HTTP.
         options.RequireHttpsMetadata = false;
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidIssuer = ApiJwtDefaults.Issuer,
-            ValidAudience = ApiJwtDefaults.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(signingKeyBytes),
-            ClockSkew = ApiJwtDefaults.ClockSkew,
-        };
+        options.TokenValidationParameters = ApiJwtDefaults.CreateValidationParameters(signingKeyBytes);
     });
 
 builder.Services.AddTenantPolicies();

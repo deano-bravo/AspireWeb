@@ -11,7 +11,7 @@ namespace AspireWeb.Data;
 /// never call the bare IgnoreQueryFilters() — use IgnoreQueryFilters([TenantFilterName])
 /// only where crossing tenants is explicitly justified.
 /// </summary>
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext tenantContext)
+public sealed class TenantDbContext(DbContextOptions<TenantDbContext> options, ITenantContext tenantContext)
     : DbContext(options)
 {
     public const string MigrationsHistoryTableName = "__ef_migrations_app";

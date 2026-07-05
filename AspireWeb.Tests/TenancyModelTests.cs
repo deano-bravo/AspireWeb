@@ -23,7 +23,7 @@ public class TenancyModelTests
         Assert.NotEmpty(tenantOwned);
         Assert.All(tenantOwned, entityType =>
             Assert.Contains(entityType.GetDeclaredQueryFilters(),
-                filter => filter.Key == AppDbContext.TenantFilterName));
+                filter => filter.Key == TenantDbContext.TenantFilterName));
     }
 
     [Fact]
@@ -88,14 +88,14 @@ public class TenancyModelTests
         Assert.Single(await contextA2.TodoItems.ToListAsync(cancellationToken));
     }
 
-    private static AppDbContext CreateModelOnlyContext() =>
-        new(new DbContextOptionsBuilder<AppDbContext>()
+    private static TenantDbContext CreateModelOnlyContext() =>
+        new(new DbContextOptionsBuilder<TenantDbContext>()
                 .UseNpgsql("Host=localhost;Database=model-only;Username=model")
                 .Options,
             new UnscopedTenantContext());
 
-    private static AppDbContext CreateInMemoryContext(ITenantContext tenantContext, string storeName) =>
-        new(new DbContextOptionsBuilder<AppDbContext>()
+    private static TenantDbContext CreateInMemoryContext(ITenantContext tenantContext, string storeName) =>
+        new(new DbContextOptionsBuilder<TenantDbContext>()
                 .UseInMemoryDatabase(storeName)
                 .AddInterceptors(new TenantSaveChangesInterceptor(tenantContext))
                 .Options,

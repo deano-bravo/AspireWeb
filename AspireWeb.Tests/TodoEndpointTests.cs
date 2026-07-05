@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AspireWeb.Contracts;
 using AspireWeb.Data.Entities;
 using AspireWeb.ServiceDefaults;
 
@@ -71,7 +72,7 @@ public class TodoEndpointTests(AppFixture fixture)
 
         using var created = await PostTodoAsync(client, token, title, cancellationToken);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        var item = await created.Content.ReadFromJsonAsync<TodoItemResponse>(cancellationToken);
+        var item = await created.Content.ReadFromJsonAsync<TodoItemDto>(cancellationToken);
         Assert.NotNull(item);
 
         using var deleteRequest = AppFixture.ApiRequest(HttpMethod.Delete, $"/todos/{item.Id}", token);
@@ -80,7 +81,7 @@ public class TodoEndpointTests(AppFixture fixture)
 
         using var listRequest = AppFixture.ApiRequest(HttpMethod.Get, "/todos", token);
         using var list = await client.SendAsync(listRequest, cancellationToken);
-        var remaining = await list.Content.ReadFromJsonAsync<List<TodoItemResponse>>(cancellationToken);
+        var remaining = await list.Content.ReadFromJsonAsync<List<TodoItemDto>>(cancellationToken);
         Assert.DoesNotContain(remaining ?? [], todo => todo.Title == title);
     }
 
@@ -121,6 +122,4 @@ public class TodoEndpointTests(AppFixture fixture)
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
         return document.RootElement.GetProperty(property).Clone();
     }
-
-    private sealed record TodoItemResponse(Guid Id, string Title, DateTimeOffset CreatedAt);
 }

@@ -21,24 +21,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # global.json pins the exact preview SDK; setup-dotnet resolves it from the official
-      # CDN. If a pinned preview ever fails to resolve, fall back to:
-      #   curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --jsonfile global.json
-      - uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-
-      - uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'global.json', '**/*.csproj') }}
-          restore-keys: nuget-${{ runner.os }}-
-
-      - name: Restore
-        run: dotnet restore AspireWeb.slnx
-
-      - name: Build (warnings as errors)
-        run: dotnet build AspireWeb.slnx -c Release --no-restore -warnaserror
+      # Setup + NuGet cache + restore + build (-warnaserror) — see .github/actions/dotnet-setup.
+      - uses: ./.github/actions/dotnet-setup
 
       # Docker-free tier: excludes the AppHost-backed integration collection.
       # --minimum-expected-tests guards against a trait/filter typo silently selecting nothing.
@@ -63,21 +47,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
-
-      - uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'global.json', '**/*.csproj') }}
-          restore-keys: nuget-${{ runner.os }}-
-
-      - name: Restore
-        run: dotnet restore AspireWeb.slnx
-
-      - name: Build
-        run: dotnet build AspireWeb.slnx -c Release --no-restore
+      # Rebuilds on this fresh runner: passing .NET bin/obj between jobs is fragile, so the
+      # shared action restores + builds again. Revisit if build time becomes a bottleneck.
+      - uses: ./.github/actions/dotnet-setup
 
       # Boots the full AppHost per collection fixture: Docker is preinstalled on
       # ubuntu-latest; DCP + dashboard binaries ship via the Aspire NuGet packages.

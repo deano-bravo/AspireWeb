@@ -9,9 +9,15 @@ public sealed class Tenant
 {
     /// <summary>
     /// Single source of truth for the table name: ApplicationDbContext owns the table,
-    /// AppDbContext maps it FK-only (ExcludeFromMigrations) — both must agree.
+    /// TenantDbContext maps it FK-only (ExcludeFromMigrations) — both must agree.
     /// </summary>
     public const string TableName = "Tenants";
+
+    /// <summary>Max length of <see cref="Identifier"/>; also bounds the registration input.</summary>
+    public const int IdentifierMaxLength = 64;
+
+    /// <summary>Max length of <see cref="Name"/>.</summary>
+    public const int NameMaxLength = 128;
 
     public Guid Id { get; set; }
 

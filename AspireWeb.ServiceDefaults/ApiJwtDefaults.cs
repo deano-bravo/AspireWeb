@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 
 namespace AspireWeb.ServiceDefaults;
 
@@ -17,6 +18,12 @@ public static class ApiJwtDefaults
 
     public static readonly TimeSpan TokenLifetime = TimeSpan.FromMinutes(5);
     public static readonly TimeSpan ClockSkew = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// The minting side refreshes a cached token this long before expiry, so a request never
+    /// carries an about-to-expire token that the API would reject in flight.
+    /// </summary>
+    public static readonly TimeSpan RenewalSkew = TimeSpan.FromSeconds(30);
 
     /// <summary>HS256 floor: a shorter key weakens the signature below the algorithm's strength.</summary>
     private const int MinimumKeyLengthBytes = 32;
@@ -52,4 +59,17 @@ public static class ApiJwtDefaults
                 $"Configuration '{SigningKeyConfigurationKey}' must decode to at least " +
                 $"{MinimumKeyLengthBytes} bytes for HS256; got {keyBytes.Length}.");
     }
+
+    /// <summary>
+    /// The token-validation parameters the API enforces. Single source so the API's JwtBearer
+    /// configuration and the token-minter tests cannot drift from the issued-token shape.
+    /// </summary>
+    public static TokenValidationParameters CreateValidationParameters(byte[] signingKeyBytes) =>
+        new()
+        {
+            ValidIssuer = Issuer,
+            ValidAudience = Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(signingKeyBytes),
+            ClockSkew = ClockSkew,
+        };
 }

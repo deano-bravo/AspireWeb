@@ -1,19 +1,27 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Pins transitive dependencies that also carry a PackageVersion below, so the EF anchor
+         (Microsoft.EntityFrameworkCore) is locked even where it only appears transitively. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Aspire -->
+    <!-- Aspire. Aspire.Hosting.Kubernetes ships preview-only at this line (no stable 13.4.6 build);
+         keep it in step with the stable Aspire packages below and drop the preview suffix once a
+         stable build exists. -->
     <PackageVersion Include="Aspire.Hosting.Kubernetes" Version="13.4.6-preview.1.26319.6" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
     <PackageVersion Include="Aspire.Npgsql" Version="13.4.6" />
-    <!-- EF Core 11 preview: the Npgsql provider pins Microsoft.EntityFrameworkCore EXACTLY to
-         [11.0.0-preview.5.26302.115]; every EF-adjacent package (and the dotnet-ef local tool)
-         must move together on any bump. Regenerate (don't chain) migrations at RC/GA.
-         Deliberately NOT Aspire.Npgsql.EntityFrameworkCore.PostgreSQL — it is compiled against
-         the EF 10 provider; Aspire.Npgsql (ADO level) is the stable path. -->
+    <!-- EF Core 11 preview: the Npgsql provider (its own version line, 11.0.0-preview.5) transitively
+         pins Microsoft.EntityFrameworkCore EXACTLY to [11.0.0-preview.5.26302.115]. That anchor is
+         declared explicitly here and, with CentralPackageTransitivePinningEnabled, locked even where
+         it only appears transitively — so every EF-adjacent package (and the dotnet-ef local tool)
+         moves together on a bump. Regenerate (don't chain) migrations at RC/GA. Deliberately NOT
+         Aspire.Npgsql.EntityFrameworkCore.PostgreSQL — it is compiled against the EF 10 provider;
+         Aspire.Npgsql (ADO level) is the stable path. -->
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="11.0.0-preview.5" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="11.0.0-preview.5.26302.115" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="11.0.0-preview.5.26302.115" />
     <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="11.0.0-preview.5.26302.115" />
     <PackageVersion Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="11.0.0-preview.5.26302.115" />
@@ -33,6 +41,8 @@
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.16.0" />
+    <!-- Runtime instrumentation versions independently of the core OpenTelemetry 1.16.0 line;
+         1.15.1 is its latest release. -->
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.1" />
     <!-- Test (Microsoft.Testing.Platform runner; coverage via the MTP extension — the old
          coverlet.collector was a VSTest data collector and a no-op under MTP) -->

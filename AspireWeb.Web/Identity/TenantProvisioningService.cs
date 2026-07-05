@@ -3,7 +3,6 @@ using AspireWeb.Data.Entities;
 using AspireWeb.Data.Tenancy;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace AspireWeb.Web.Identity;
 
@@ -46,8 +45,7 @@ public sealed class TenantProvisioningService(
             {
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
-            catch (DbUpdateException exception)
-                when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+            catch (DbUpdateException exception) when (PostgresErrors.IsUniqueViolation(exception))
             {
                 // The unique index on Tenants.Identifier is the enforcement; this is just the friendly message.
                 return TenantProvisioningResult.Failed(

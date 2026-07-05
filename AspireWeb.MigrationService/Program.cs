@@ -5,11 +5,11 @@ using AspireWeb.MigrationService;
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.AddServiceDefaults();
-builder.AddNpgsqlDataSource("appdb");
+builder.AddNpgsqlDataSource(DatabaseNames.AppDatabase);
 
 builder.Services.AddSingleton<ITenantContext, UnscopedTenantContext>();
 builder.Services.AddIdentityDbContext();
-builder.Services.AddAppDbContext();
+builder.Services.AddTenantDbContext();
 
 builder.Services.AddHostedService<Worker>();
 

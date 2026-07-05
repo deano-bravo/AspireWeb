@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using AspireWeb.Data.Tenancy;
 using AspireWeb.ServiceDefaults;
 
@@ -10,10 +9,5 @@ namespace AspireWeb.ApiService.Tenancy;
 /// </summary>
 public sealed class ClaimsTenantContext(IHttpContextAccessor httpContextAccessor) : ITenantContext
 {
-    public Guid? TenantId =>
-        Guid.TryParse(
-            httpContextAccessor.HttpContext?.User.FindFirstValue(TenantClaimTypes.TenantId),
-            out var tenantId)
-            ? tenantId
-            : null;
+    public Guid? TenantId => httpContextAccessor.HttpContext?.User.GetTenantId();
 }

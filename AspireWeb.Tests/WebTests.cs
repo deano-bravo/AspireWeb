@@ -1,19 +1,20 @@
 namespace AspireWeb.Tests;
 
+/// <summary>
+/// Smoke tests over the running AppHost: the web front end serves its root and the weather
+/// API stays anonymous.
+/// </summary>
 [Collection(AppHostCollectionDefinition.Name)]
 [Trait(TestCategories.TraitName, TestCategories.Integration)]
 public class WebTests(AppFixture fixture)
 {
     [Fact]
-    public async Task GetWebResourceRootReturnsOkStatusCode()
+    public async Task WebRootRespondsWithOk()
     {
-        // Arrange
         using var httpClient = fixture.App.CreateHttpClient("webfrontend");
 
-        // Act
         var response = await httpClient.GetAsync("/", TestContext.Current.CancellationToken);
 
-        // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 

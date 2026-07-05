@@ -1,0 +1,23 @@
+# Normalize line endings in the repo (store LF); check out with the platform default.
+# Independent of each contributor's core.autocrlf, so diffs stay clean.
+* text=auto
+
+# Shell scripts run in Git Bash / Linux (the k8s tooling, e.g. k8s/gen-cert.sh) — must be LF
+# or they break when executed.
+*.sh text eol=lf
+
+# Windows-only scripts — keep CRLF.
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary assets: never normalize line endings.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pfx binary
+*.crt binary

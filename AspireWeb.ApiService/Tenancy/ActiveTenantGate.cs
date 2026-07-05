@@ -10,7 +10,7 @@ namespace AspireWeb.ApiService.Tenancy;
 /// inactive verdict is cached only briefly so a reactivated tenant is unblocked in seconds.
 /// (IMemoryCache is per-pod — swap to a distributed/hybrid cache when replicas matter.)
 /// </summary>
-public sealed class ActiveTenantGate(AppDbContext dbContext, IMemoryCache cache)
+public sealed class ActiveTenantGate(TenantDbContext dbContext, IMemoryCache cache)
 {
     private static readonly TimeSpan ActiveTtl = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan InactiveTtl = TimeSpan.FromSeconds(5);

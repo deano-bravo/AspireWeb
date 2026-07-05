@@ -24,7 +24,7 @@ AppHost-backed integration tier).
 | ApiService | [AspireWeb.ApiService/](AspireWeb.ApiService/) | Minimal-API backend. Anonymous `/weatherforecast`; tenant-scoped `/todos` behind JWT bearer auth. |
 | Web | [AspireWeb.Web/](AspireWeb.Web/) | Blazor Server front end. ASP.NET Core Identity (cookie auth, `Components/Account/**`), tenant-aware registration, calls the API via typed clients in `Clients/`. |
 | Contracts | [AspireWeb.Contracts/](AspireWeb.Contracts/) | Shared web↔api wire contracts (`TodoItemDto`, `CreateTodoRequest`, `WeatherForecast`). Deliberately dependency-free. |
-| Data | [AspireWeb.Data/](AspireWeb.Data/) | Entities, the two DbContexts (+ shared registration extensions `AddAppDbContext`/`AddIdentityDbContext`), tenancy primitives, EF migrations, design-time factories. |
+| Data | [AspireWeb.Data/](AspireWeb.Data/) | Entities, the two DbContexts (+ shared registration extensions `AddTenantDbContext`/`AddIdentityDbContext`), tenancy primitives, EF migrations, design-time factories. |
 | MigrationService | [AspireWeb.MigrationService/](AspireWeb.MigrationService/) | Applies EF migrations for both contexts at startup; AppHost gates web/api on `WaitForCompletion`. |
 | ServiceDefaults | [AspireWeb.ServiceDefaults/](AspireWeb.ServiceDefaults/) | Shared OpenTelemetry, health checks, service discovery, HTTP resilience — plus the shared tenancy contract (`TenantClaimTypes`, `TenantPolicies`, `ApiJwtDefaults`, `AddTenantPolicies`). |
 | Tests | [AspireWeb.Tests/](AspireWeb.Tests/) | xUnit v3 on the Microsoft.Testing.Platform runner. Fast unit tier (model/interceptor/token-service; no Docker) + `Category=Integration` tests over the full AppHost (`AppFixture` as a collection fixture — deliberately NOT an assembly fixture, which xunit creates eagerly even for filtered runs). References Web to unit-test its services. |
@@ -38,13 +38,13 @@ discovery** (`https+http://apiservice`) — never hardcode host/port.
 ## Multi-tenancy model (understand before touching data or endpoints)
 
 - **Shared database, row-level isolation.** Every tenant-owned entity implements
-  `ITenantOwned { Guid TenantId }`. [AppDbContext](AspireWeb.Data/AppDbContext.cs) applies a
-  **named global query filter** (`AppDbContext.TenantFilterName`) to every `ITenantOwned`
+  `ITenantOwned { Guid TenantId }`. [TenantDbContext](AspireWeb.Data/TenantDbContext.cs) applies a
+  **named global query filter** (`TenantDbContext.TenantFilterName`) to every `ITenantOwned`
   entity **by convention** — never hand-code per-entity filters.
   [TenantSaveChangesInterceptor](AspireWeb.Data/Tenancy/TenantSaveChangesInterceptor.cs)
   stamps `TenantId` on inserts and throws on cross-tenant writes.
 - **Bare `IgnoreQueryFilters()` is banned** — it drops tenant isolation. Use
-  `IgnoreQueryFilters([AppDbContext.TenantFilterName])` only where crossing tenants is
+  `IgnoreQueryFilters([TenantDbContext.TenantFilterName])` only where crossing tenants is
   explicitly justified, and expect it to be challenged in review.
 - **Raw SQL must include a `tenant_id` predicate** (none exists today; keep it that way
   unless unavoidable).
@@ -77,7 +77,7 @@ discovery** (`https+http://apiservice`) — never hardcode host/port.
   [AspireWeb.Contracts/](AspireWeb.Contracts/) — never duplicate a request/response shape
   per project, and never post anonymous objects for a typed contract.
 - Hosts register DbContexts via the shared
-  [AddAppDbContext / AddIdentityDbContext](AspireWeb.Data/ServiceCollectionExtensions.cs)
+  [AddTenantDbContext / AddIdentityDbContext](AspireWeb.Data/ServiceCollectionExtensions.cs)
   extensions (history table, retry policy, tenancy interceptor, Identity schema-version pin
   live there) — don't hand-roll `AddDbContext` blocks. Each host keeps its own
   `builder.AddNpgsqlDataSource("appdb")`.
@@ -128,6 +128,7 @@ aspire run                                    # run locally with the Aspire dash
 dotnet build AspireWeb.slnx -c Release -warnaserror   # build, warnings are errors
 dotnet test --solution AspireWeb.slnx -c Release      # full suite: unit + integration (needs Docker)
 dotnet test --solution AspireWeb.slnx -c Release -- --filter-not-trait Category=Integration   # fast tier, no Docker, seconds
+dotnet format AspireWeb.slnx                   # auto-format to the .editorconfig style rules
 aspire restore                                # restore + generate AppHost SDK code
 aspire doctor                                 # diagnose the Aspire/container environment
 dotnet tool restore                           # restores dotnet-ef (and aspire) local tools
@@ -159,11 +160,11 @@ classlib self-sufficient (no host boot, no DB connection needed for `migrations 
 
 ```powershell
 dotnet ef migrations add <Name> --project AspireWeb.Data --startup-project AspireWeb.Data --context ApplicationDbContext --output-dir Migrations/Identity
-dotnet ef migrations add <Name> --project AspireWeb.Data --startup-project AspireWeb.Data --context AppDbContext         --output-dir Migrations/App
+dotnet ef migrations add <Name> --project AspireWeb.Data --startup-project AspireWeb.Data --context TenantDbContext      --output-dir Migrations/App
 ```
 
 Migrations are applied at runtime by the MigrationService (Identity context first — it owns
-the `Tenants` table that `AppDbContext` FKs target; `AppDbContext` maps `Tenants` with
+the `Tenants` table that `TenantDbContext` FKs target; `TenantDbContext` maps `Tenants` with
 `ExcludeFromMigrations`, so an App migration containing `CreateTable("Tenants")` is a bug).
 
 ## Continuous integration

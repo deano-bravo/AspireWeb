@@ -25,6 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AspireWeb.AppHost\AspireWeb.AppHost.csproj" />
+    <ProjectReference Include="..\AspireWeb.Contracts\AspireWeb.Contracts.csproj" />
     <ProjectReference Include="..\AspireWeb.Data\AspireWeb.Data.csproj" />
     <ProjectReference Include="..\AspireWeb.ServiceDefaults\AspireWeb.ServiceDefaults.csproj" />
     <!-- Referenced to unit-test Web services (e.g. TenantTokenService) directly; the HTTP
