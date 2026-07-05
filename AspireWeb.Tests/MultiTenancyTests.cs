@@ -1,3 +1,4 @@
+using AspireWeb.Contracts;
 using AspireWeb.ServiceDefaults;
 
 namespace AspireWeb.Tests;
@@ -101,9 +102,7 @@ public class MultiTenancyTests(AppFixture fixture)
 
     private static async Task<string[]> ReadTitlesAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
-        var items = await response.Content.ReadFromJsonAsync<List<TodoItemResponse>>(cancellationToken);
+        var items = await response.Content.ReadFromJsonAsync<List<TodoItemDto>>(cancellationToken);
         return items?.Select(item => item.Title).ToArray() ?? [];
     }
-
-    private sealed record TodoItemResponse(Guid Id, string Title, DateTimeOffset CreatedAt);
 }

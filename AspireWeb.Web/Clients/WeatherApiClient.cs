@@ -4,23 +4,7 @@ namespace AspireWeb.Web.Clients;
 
 public sealed class WeatherApiClient(HttpClient httpClient)
 {
-    public async Task<WeatherForecast[]> GetWeatherAsync(int maxItems = 10, CancellationToken cancellationToken = default)
-    {
-        List<WeatherForecast>? forecasts = null;
-
-        await foreach (var forecast in httpClient.GetFromJsonAsAsyncEnumerable<WeatherForecast>("/weatherforecast", cancellationToken))
-        {
-            if (forecasts?.Count >= maxItems)
-            {
-                break;
-            }
-            if (forecast is not null)
-            {
-                forecasts ??= [];
-                forecasts.Add(forecast);
-            }
-        }
-
-        return forecasts?.ToArray() ?? [];
-    }
+    // The forecast endpoint is anonymous and returns a small fixed array, so read it in one shot.
+    public async Task<WeatherForecast[]> GetWeatherAsync(CancellationToken cancellationToken = default) =>
+        await httpClient.GetFromJsonAsync<WeatherForecast[]>("/weatherforecast", cancellationToken) ?? [];
 }

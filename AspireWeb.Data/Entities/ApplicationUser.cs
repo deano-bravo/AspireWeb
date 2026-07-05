@@ -4,6 +4,9 @@ namespace AspireWeb.Data.Entities;
 
 public sealed class ApplicationUser : IdentityUser
 {
+    /// <summary>Max length of <see cref="DisplayName"/>.</summary>
+    public const int DisplayNameMaxLength = 128;
+
     /// <summary>Every user belongs to exactly one tenant.</summary>
     public Guid TenantId { get; set; }
 

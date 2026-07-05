@@ -10,8 +10,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace AspireWeb.Data.Migrations.App;
 
-[DbContext(typeof(AppDbContext))]
-partial class AppDbContextModelSnapshot : ModelSnapshot
+[DbContext(typeof(TenantDbContext))]
+partial class TenantDbContextModelSnapshot : ModelSnapshot
 {
     // If you encounter a merge conflict in the line below, it means you need to
     // discard one of the migration branches and recreate its migrations on top of

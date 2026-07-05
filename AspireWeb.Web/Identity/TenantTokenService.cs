@@ -17,8 +17,6 @@ public sealed class TenantTokenService(
     IConfiguration configuration,
     TimeProvider timeProvider)
 {
-    private static readonly TimeSpan RenewalSkew = TimeSpan.FromSeconds(30);
-
     private string? _cachedToken;
     private DateTimeOffset _expiresAt;
 
@@ -28,7 +26,7 @@ public sealed class TenantTokenService(
         cancellationToken.ThrowIfCancellationRequested();
 
         var now = timeProvider.GetUtcNow();
-        if (_cachedToken is not null && now < _expiresAt - RenewalSkew)
+        if (_cachedToken is not null && now < _expiresAt - ApiJwtDefaults.RenewalSkew)
         {
             return _cachedToken;
         }

@@ -6,6 +6,11 @@ builder.AddKubernetesEnvironment("k8s");
 // user-secrets: dotnet user-secrets set Parameters:jwt-signing-key <key> --project AspireWeb.AppHost
 var jwtSigningKey = builder.AddParameter("jwt-signing-key", secret: true);
 
+// Env-var form of ApiJwtDefaults.SigningKeyConfigurationKey ("Auth:ApiJwt:SigningKey"): "__"
+// is configuration's separator for environment variables. Kept as a literal because the AppHost
+// deliberately does not reference ServiceDefaults.
+const string jwtSigningKeyEnvVar = "Auth__ApiJwt__SigningKey";
+
 var postgres = builder.AddPostgres("postgres");
 if (builder.ExecutionContext.IsPublishMode)
 {
@@ -27,7 +32,7 @@ var apiService = builder.AddProject<Projects.AspireWeb_ApiService>("apiservice")
     .WithHttpHealthCheck("/health")
     .WithReference(appdb)
     .WaitForCompletion(migrations)
-    .WithEnvironment("Auth__ApiJwt__SigningKey", jwtSigningKey);
+    .WithEnvironment(jwtSigningKeyEnvVar, jwtSigningKey);
 
 builder.AddProject<Projects.AspireWeb_Web>("webfrontend")
     .WithExternalHttpEndpoints()
@@ -36,6 +41,6 @@ builder.AddProject<Projects.AspireWeb_Web>("webfrontend")
     .WaitForCompletion(migrations)
     .WithReference(apiService)
     .WaitFor(apiService)
-    .WithEnvironment("Auth__ApiJwt__SigningKey", jwtSigningKey);
+    .WithEnvironment(jwtSigningKeyEnvVar, jwtSigningKey);
 
 await builder.Build().RunAsync();

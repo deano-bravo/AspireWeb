@@ -1,0 +1,28 @@
+name: dotnet-setup
+description: >
+  Set up the pinned .NET SDK (from global.json), restore with NuGet caching, and build the
+  solution with warnings-as-errors. Shared by both CI jobs so setup/restore/build stay in sync.
+
+runs:
+  using: composite
+  steps:
+    # global.json pins the exact preview SDK; setup-dotnet resolves it from the official CDN.
+    # If a pinned preview ever fails to resolve, fall back to:
+    #   curl -sSL https://dot.net/v1/dotnet-install.sh | bash /dev/stdin --jsonfile global.json
+    - uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
+
+    - uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props', 'global.json', '**/*.csproj') }}
+        restore-keys: nuget-${{ runner.os }}-
+
+    - name: Restore
+      shell: bash
+      run: dotnet restore AspireWeb.slnx
+
+    - name: Build (warnings as errors)
+      shell: bash
+      run: dotnet build AspireWeb.slnx -c Release --no-restore -warnaserror

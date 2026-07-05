@@ -11,7 +11,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace AspireWeb.Data.Migrations.App;
 
-[DbContext(typeof(AppDbContext))]
+[DbContext(typeof(TenantDbContext))]
 [Migration("20260702233059_InitialApp")]
 partial class _20260702233059_InitialApp
 {

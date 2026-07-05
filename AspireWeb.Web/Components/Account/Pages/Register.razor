@@ -152,7 +152,7 @@
     private sealed class InputModel
     {
         [Required]
-        [StringLength(64, ErrorMessage = "The {0} must be at most {1} characters long.")]
+        [StringLength(Tenant.IdentifierMaxLength, ErrorMessage = "The {0} must be at most {1} characters long.")]
         [Display(Name = "Organisation name")]
         public string OrganizationName { get; set; } = "";
 

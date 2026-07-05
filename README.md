@@ -25,14 +25,10 @@ dotnet user-secrets set "Parameters:jwt-signing-key" "<base64-32-bytes>" --proje
 
 ## Commands
 
-| Command | Purpose |
-| --- | --- |
-| `aspire run` | Run the whole app locally with the Aspire dashboard (PowerShell). |
-| `dotnet build AspireWeb.slnx -c Release -warnaserror` | Build; fail on any warning. |
-| `dotnet test --solution AspireWeb.slnx -c Release` | Full test suite: fast unit tests **plus** AppHost-backed integration tests (needs Docker). |
-| `dotnet test --solution AspireWeb.slnx -c Release -- --filter-not-trait Category=Integration` | Fast tier only — no Docker, runs in seconds. |
-| `aspire publish -o ./aspire-output` | Generate the Kubernetes Helm chart. |
-| `dotnet format` | Auto-format to style rules. |
+`aspire run` starts the whole app locally with the Aspire dashboard. For the full command
+reference — build (`-warnaserror`), the two test tiers, `dotnet format`, `aspire publish`, EF
+migrations, and secrets — see **[CLAUDE.md → Commands](CLAUDE.md#commands)** (kept as the single
+source so the lists don't drift).
 
 The test suite is two-tier: model/service unit tests run anywhere; tests marked
 `Category=Integration` boot the full AppHost (Postgres container + migrations + services).

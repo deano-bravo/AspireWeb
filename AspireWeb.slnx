@@ -1,10 +1,16 @@
 <Solution>
-  <Project Path="AspireWeb.ApiService/AspireWeb.ApiService.csproj" />
-  <Project Path="AspireWeb.AppHost/AspireWeb.AppHost.csproj" />
-  <Project Path="AspireWeb.Contracts/AspireWeb.Contracts.csproj" />
-  <Project Path="AspireWeb.Data/AspireWeb.Data.csproj" />
-  <Project Path="AspireWeb.MigrationService/AspireWeb.MigrationService.csproj" />
-  <Project Path="AspireWeb.ServiceDefaults/AspireWeb.ServiceDefaults.csproj" />
-  <Project Path="AspireWeb.Tests/AspireWeb.Tests.csproj" />
-  <Project Path="AspireWeb.Web/AspireWeb.Web.csproj" />
+  <Folder Name="/apps/">
+    <Project Path="AspireWeb.AppHost/AspireWeb.AppHost.csproj" />
+    <Project Path="AspireWeb.ApiService/AspireWeb.ApiService.csproj" />
+    <Project Path="AspireWeb.Web/AspireWeb.Web.csproj" />
+    <Project Path="AspireWeb.MigrationService/AspireWeb.MigrationService.csproj" />
+  </Folder>
+  <Folder Name="/libraries/">
+    <Project Path="AspireWeb.Contracts/AspireWeb.Contracts.csproj" />
+    <Project Path="AspireWeb.Data/AspireWeb.Data.csproj" />
+    <Project Path="AspireWeb.ServiceDefaults/AspireWeb.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="AspireWeb.Tests/AspireWeb.Tests.csproj" />
+  </Folder>
 </Solution>

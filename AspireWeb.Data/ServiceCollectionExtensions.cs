@@ -17,16 +17,16 @@ namespace AspireWeb.Data;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the tenant-scoped <see cref="AppDbContext"/> with its write-side guard.
+    /// Registers the tenant-scoped <see cref="TenantDbContext"/> with its write-side guard.
     /// The host must also register an <see cref="ITenantContext"/> — the context's
     /// constructor requires one, so a missing registration fails fast at first resolve.
     /// </summary>
-    public static IServiceCollection AddAppDbContext(this IServiceCollection services)
+    public static IServiceCollection AddTenantDbContext(this IServiceCollection services)
     {
         services.TryAddScoped<TenantSaveChangesInterceptor>();
-        services.AddDbContext<AppDbContext>((provider, options) =>
+        services.AddDbContext<TenantDbContext>((provider, options) =>
             options.UseNpgsql(provider.GetRequiredService<NpgsqlDataSource>(), npgsql =>
-                    npgsql.MigrationsHistoryTable(AppDbContext.MigrationsHistoryTableName)
+                    npgsql.MigrationsHistoryTable(TenantDbContext.MigrationsHistoryTableName)
                         .EnableRetryOnFailure())
                 .AddInterceptors(provider.GetRequiredService<TenantSaveChangesInterceptor>()));
         return services;

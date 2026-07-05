@@ -69,8 +69,8 @@ public class TenantTokenServiceTests
         var cancellationToken = TestContext.Current.CancellationToken;
 
         string first = await service.GetTokenAsync(cancellationToken);
-        // 30s renewal skew: at lifetime - 29s the cached token is inside the skew window.
-        time.Advance(ApiJwtDefaults.TokenLifetime - TimeSpan.FromSeconds(29));
+        // Advance to just inside the renewal-skew window (remaining lifetime < RenewalSkew): renew.
+        time.Advance(ApiJwtDefaults.TokenLifetime - ApiJwtDefaults.RenewalSkew + TimeSpan.FromSeconds(1));
         string renewed = await service.GetTokenAsync(cancellationToken);
 
         Assert.NotEqual(first, renewed);
@@ -153,15 +153,10 @@ public class TenantTokenServiceTests
 
     private static IConfiguration EmptyConfiguration() => new ConfigurationBuilder().Build();
 
-    /// <summary>The same validation the API's JwtBearer performs (see ApiService Program.cs).</summary>
+    /// <summary>The exact parameters the API's JwtBearer enforces, via the shared factory.</summary>
     private static async Task<TokenValidationResult> ValidateAsync(string token) =>
-        await new JsonWebTokenHandler().ValidateTokenAsync(token, new TokenValidationParameters
-        {
-            ValidIssuer = ApiJwtDefaults.Issuer,
-            ValidAudience = ApiJwtDefaults.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Convert.FromBase64String(AppFixture.JwtSigningKey)),
-            ClockSkew = ApiJwtDefaults.ClockSkew,
-        });
+        await new JsonWebTokenHandler().ValidateTokenAsync(token,
+            ApiJwtDefaults.CreateValidationParameters(Convert.FromBase64String(AppFixture.JwtSigningKey)));
 
     private static string? GetClaim(TokenValidationResult result, string type) =>
         result.ClaimsIdentity.FindFirst(type)?.Value;

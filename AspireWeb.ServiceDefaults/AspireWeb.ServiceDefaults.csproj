@@ -9,6 +9,9 @@
 
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" />
+    <!-- ApiJwtDefaults owns the JWT contract + validation-parameter factory (Microsoft.IdentityModel.Tokens
+         flows transitively). Both the minting side (Web) and the validating side (API) consume it. -->
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />

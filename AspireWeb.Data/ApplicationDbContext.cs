@@ -7,7 +7,7 @@ namespace AspireWeb.Data;
 
 /// <summary>
 /// Identity + tenant registry + DataProtection keys. Used by the Web front end and
-/// the migration service. Owns the Tenants table (AppDbContext maps it FK-only).
+/// the migration service. Owns the Tenants table (TenantDbContext maps it FK-only).
 /// </summary>
 public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
     : IdentityDbContext<ApplicationUser>(options), IDataProtectionKeyContext
@@ -25,15 +25,15 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
         builder.Entity<Tenant>(tenant =>
         {
             tenant.ToTable(Tenant.TableName);
-            tenant.Property(t => t.Identifier).HasMaxLength(64);
-            tenant.Property(t => t.Name).HasMaxLength(128);
+            tenant.Property(t => t.Identifier).HasMaxLength(Tenant.IdentifierMaxLength);
+            tenant.Property(t => t.Name).HasMaxLength(Tenant.NameMaxLength);
             tenant.HasIndex(t => t.Identifier).IsUnique();
         });
 
         builder.Entity<ApplicationUser>(user =>
         {
             user.HasOne(u => u.Tenant).WithMany().HasForeignKey(u => u.TenantId);
-            user.Property(u => u.DisplayName).HasMaxLength(128);
+            user.Property(u => u.DisplayName).HasMaxLength(ApplicationUser.DisplayNameMaxLength);
         });
     }
 }

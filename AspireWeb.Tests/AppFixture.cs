@@ -136,7 +136,11 @@ public sealed partial class AppFixture : IAsyncLifetime
 
     public static string UniqueOrganization(string prefix) => $"{prefix} {Guid.NewGuid():N}";
 
-    /// <summary>Mints an API token the way the web front end does (or a forged/partial one).</summary>
+    /// <summary>
+    /// Mints an API token the way the web front end does (or a forged/partial one). Deliberately
+    /// re-implements TenantTokenService's descriptor so tests can forge partial/wrong-key tokens —
+    /// keep the claim shape in sync with that service.
+    /// </summary>
     public static string MintJwt(
         Guid? tenantId, string userId, string role = TenantRoleNames.Member, string? signingKey = null)
     {

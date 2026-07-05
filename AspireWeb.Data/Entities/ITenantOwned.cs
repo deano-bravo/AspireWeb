@@ -1,7 +1,7 @@
 namespace AspireWeb.Data.Entities;
 
 /// <summary>
-/// Marks an entity as owned by a tenant. AppDbContext applies the named "Tenant"
+/// Marks an entity as owned by a tenant. TenantDbContext applies the named "Tenant"
 /// global query filter to every implementation by convention, and
 /// TenantSaveChangesInterceptor stamps/validates TenantId on writes.
 /// </summary>
