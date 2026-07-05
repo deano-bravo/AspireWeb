@@ -9,9 +9,7 @@ public sealed class TenantDbContextFactory : IDesignTimeDbContextFactory<TenantD
     public TenantDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<TenantDbContext>()
-            .UseNpgsql(
-                DesignTimeConnection.ConnectionString,
-                npgsql => npgsql.MigrationsHistoryTable(TenantDbContext.MigrationsHistoryTableName))
+            .UseDesignTimeNpgsql(TenantDbContext.MigrationsHistoryTableName)
             .Options;
 
         return new TenantDbContext(options, new UnscopedTenantContext());

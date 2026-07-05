@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 
 namespace AspireWeb.Data.Entities;
 
+/// <summary>An identity user, extended with the tenant it belongs to and its role within that tenant.</summary>
 public sealed class ApplicationUser : IdentityUser
 {
     /// <summary>Max length of <see cref="DisplayName"/>.</summary>

@@ -1,5 +1,5 @@
 using AspireWeb.Data.Tenancy;
-using AspireWeb.ServiceDefaults;
+using AspireWeb.ServiceDefaults.Tenancy;
 
 namespace AspireWeb.ApiService.Tenancy;
 
@@ -7,7 +7,7 @@ namespace AspireWeb.ApiService.Tenancy;
 /// Resolves the ambient tenant from the validated JWT principal. The tenant id is the
 /// security boundary and must only ever come from a validated token — never from a header.
 /// </summary>
-public sealed class ClaimsTenantContext(IHttpContextAccessor httpContextAccessor) : ITenantContext
+internal sealed class ClaimsTenantContext(IHttpContextAccessor httpContextAccessor) : ITenantContext
 {
     public Guid? TenantId => httpContextAccessor.HttpContext?.User.GetTenantId();
 }

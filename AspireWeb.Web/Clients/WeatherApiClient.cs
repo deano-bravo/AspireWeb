@@ -2,6 +2,7 @@ using AspireWeb.Contracts;
 
 namespace AspireWeb.Web.Clients;
 
+/// <summary>Typed client for the anonymous weather forecast API (no tenant token required).</summary>
 public sealed class WeatherApiClient(HttpClient httpClient)
 {
     // The forecast endpoint is anonymous and returns a small fixed array, so read it in one shot.

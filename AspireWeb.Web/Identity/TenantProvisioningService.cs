@@ -11,8 +11,9 @@ namespace AspireWeb.Web.Identity;
 /// an orphan tenant. Extracted from the Register page so the flow is reusable and testable.
 /// </summary>
 public sealed class TenantProvisioningService(
-    ApplicationDbContext dbContext,
-    UserManager<ApplicationUser> userManager)
+    AppIdentityDbContext dbContext,
+    UserManager<ApplicationUser> userManager,
+    TimeProvider timeProvider)
 {
     /// <summary>
     /// The caller prepares <paramref name="owner"/> (username/email already set); this method
@@ -38,7 +39,7 @@ public sealed class TenantProvisioningService(
                 Id = Guid.NewGuid(),
                 Name = organizationName.Trim(),
                 Identifier = TenantSlug.Normalize(organizationName),
-                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedAt = timeProvider.GetUtcNow(),
             };
             dbContext.Tenants.Add(tenant);
             try

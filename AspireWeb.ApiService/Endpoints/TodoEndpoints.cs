@@ -2,7 +2,7 @@ using AspireWeb.ApiService.Tenancy;
 using AspireWeb.Contracts;
 using AspireWeb.Data;
 using AspireWeb.Data.Entities;
-using AspireWeb.ServiceDefaults;
+using AspireWeb.ServiceDefaults.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.JsonWebTokens;
 
@@ -69,7 +69,7 @@ public static class TodoEndpoints
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        string title = request.Title?.Trim() ?? "";
+        string title = request.Title?.Trim() ?? string.Empty;
         if (title.Length == 0)
         {
             return TitleProblem("Title is required.");

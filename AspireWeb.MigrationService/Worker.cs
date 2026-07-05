@@ -23,7 +23,7 @@ public sealed partial class Worker(
             using var scope = serviceProvider.CreateScope();
 
             // Identity context first: it owns the Tenants table that TenantDbContext's FKs target.
-            await MigrateAsync<ApplicationDbContext>(scope.ServiceProvider, stoppingToken);
+            await MigrateAsync<AppIdentityDbContext>(scope.ServiceProvider, stoppingToken);
             await MigrateAsync<TenantDbContext>(scope.ServiceProvider, stoppingToken);
 
             LogMigrationsApplied(logger);

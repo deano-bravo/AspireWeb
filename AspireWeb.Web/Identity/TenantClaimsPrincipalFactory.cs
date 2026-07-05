@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using AspireWeb.Data;
 using AspireWeb.Data.Entities;
-using AspireWeb.ServiceDefaults;
+using AspireWeb.ServiceDefaults.Tenancy;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -15,7 +15,7 @@ namespace AspireWeb.Web.Identity;
 public sealed class TenantClaimsPrincipalFactory(
     UserManager<ApplicationUser> userManager,
     IOptions<IdentityOptions> optionsAccessor,
-    ApplicationDbContext dbContext)
+    AppIdentityDbContext dbContext)
     : UserClaimsPrincipalFactory<ApplicationUser>(userManager, optionsAccessor)
 {
     protected override async Task<ClaimsIdentity> GenerateClaimsAsync(ApplicationUser user)

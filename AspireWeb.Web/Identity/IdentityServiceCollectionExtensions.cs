@@ -1,40 +1,19 @@
 using AspireWeb.Data;
 using AspireWeb.Data.Entities;
-using AspireWeb.ServiceDefaults;
-using AspireWeb.Web.Clients;
+using AspireWeb.ServiceDefaults.Tenancy;
 using AspireWeb.Web.Components.Account;
-using AspireWeb.Web.Identity;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 
-namespace AspireWeb.Web;
+namespace AspireWeb.Web.Identity;
 
 /// <summary>
-/// Web host composition split out of Program.cs, mirroring how <c>AspireWeb.Data</c> factors its
-/// DbContext registration: <see cref="AddApiClients"/> wires the typed API clients (and the token
-/// minter they carry); <see cref="AddWebIdentity"/> wires ASP.NET Core Identity, cookie auth,
-/// tenant policies, and DataProtection.
+/// Wires ASP.NET Core Identity, cookie auth, the shared tenant policies, and DataProtection,
+/// split out of Program.cs alongside <c>ApiClientServiceCollectionExtensions.AddApiClients</c>.
 /// </summary>
-public static class ServiceCollectionExtensions
+public static class IdentityServiceCollectionExtensions
 {
-    // "https+http://" prefers HTTPS over HTTP via Aspire service discovery.
-    // Learn more at https://aka.ms/dotnet/sdschemes.
-    private const string ApiServiceUrl = "https+http://apiservice";
-
-    public static IServiceCollection AddApiClients(this IServiceCollection services)
-    {
-        services.AddSingleton(TimeProvider.System);
-        // Scoped and injected into the typed client directly (never a DelegatingHandler — see
-        // TenantTokenService): mints the short-lived bearer token that carries user + tenant.
-        services.AddScoped<TenantTokenService>();
-
-        services.AddHttpClient<WeatherApiClient>(client => client.BaseAddress = new(ApiServiceUrl));
-        services.AddHttpClient<TodoApiClient>(client => client.BaseAddress = new(ApiServiceUrl));
-
-        return services;
-    }
-
     public static IServiceCollection AddWebIdentity(this IServiceCollection services)
     {
         services.AddCascadingAuthenticationState();
@@ -56,7 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddDatabaseDeveloperPageExceptionFilter();
 
         services.AddIdentityCore<ApplicationUser>(ConfigureIdentityOptions)
-            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddEntityFrameworkStores<AppIdentityDbContext>()
             .AddSignInManager()
             .AddDefaultTokenProviders()
             .AddClaimsPrincipalFactory<TenantClaimsPrincipalFactory>();
@@ -82,7 +61,7 @@ public static class ServiceCollectionExtensions
         // Cookies and antiforgery tokens survive pod restarts/replicas: keys live in the database.
         // Production note: keys are stored unencrypted; add ProtectKeysWith* + a cert when it matters.
         services.AddDataProtection()
-            .PersistKeysToDbContext<ApplicationDbContext>()
+            .PersistKeysToDbContext<AppIdentityDbContext>()
             .SetApplicationName("AspireWeb");
 
         return services;

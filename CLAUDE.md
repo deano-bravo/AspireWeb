@@ -23,7 +23,7 @@ worker, and a two-tier test project.
 | Contracts | [AspireWeb.Contracts/](AspireWeb.Contracts/) | Shared web↔api wire contracts. Deliberately dependency-free. |
 | Data | [AspireWeb.Data/](AspireWeb.Data/) | Entities, both DbContexts + shared registration extensions, tenancy primitives, EF migrations, design-time factories. |
 | MigrationService | [AspireWeb.MigrationService/](AspireWeb.MigrationService/) | Applies EF migrations for both contexts at startup; AppHost gates web/api on `WaitForCompletion`. |
-| ServiceDefaults | [AspireWeb.ServiceDefaults/](AspireWeb.ServiceDefaults/) | Shared OTel/health/service-discovery/resilience + the shared tenancy contract (`TenantClaimTypes`, `TenantPolicies`, `ApiJwtDefaults`). |
+| ServiceDefaults | [AspireWeb.ServiceDefaults/](AspireWeb.ServiceDefaults/) | Shared OTel/health/service-discovery/resilience + the shared tenancy contract under [`Tenancy/`](AspireWeb.ServiceDefaults/Tenancy/) (`TenantClaimTypes`, `TenantPolicies`, `ApiJwtDefaults`). |
 | Tests | [AspireWeb.Tests/](AspireWeb.Tests/) | xUnit v3 on Microsoft.Testing.Platform. Fast unit tier (no Docker) + `Category=Integration` over the full AppHost. `AppFixture` is a collection fixture — deliberately NOT an assembly fixture (xunit creates those eagerly even for filtered runs). |
 
 **Topology** ([AppHost.cs](AspireWeb.AppHost/AppHost.cs)): `postgres` (container; `appdb`; pgweb in
@@ -48,7 +48,7 @@ Cross-service calls use Aspire **service discovery** (`https+http://apiservice`)
   `tenant_id` / `tenant_role` / `tenant_name` into the auth cookie.
 - **Web→API propagation:** the Web front end mints a 5-minute HS256 JWT
   ([TenantTokenService](AspireWeb.Web/Identity/TenantTokenService.cs), contract in
-  [ApiJwtDefaults](AspireWeb.ServiceDefaults/ApiJwtDefaults.cs)); the API resolves the tenant from
+  [ApiJwtDefaults](AspireWeb.ServiceDefaults/Tenancy/ApiJwtDefaults.cs)); the API resolves the tenant from
   the validated token (`ClaimsTenantContext`) — **never from headers**. Inject the token service
   into typed clients directly; do NOT use a `DelegatingHandler` (HttpClientFactory caches handlers
   outside the circuit scope).
@@ -62,7 +62,9 @@ Cross-service calls use Aspire **service discovery** (`https+http://apiservice`)
 
 ## Conventions (follow these)
 
-- Every service calls `builder.AddServiceDefaults()` and `app.MapDefaultEndpoints()`.
+- Every service calls `builder.AddServiceDefaults()` and `app.MapDefaultEndpoints()` — except the
+  MigrationService, a `BackgroundService` worker with no `WebApplication` (it calls
+  `AddServiceDefaults()` only; there are no endpoints to map).
 - New service-to-service HTTP = service discovery + a typed `HttpClient`, mirroring
   [TodoApiClient.cs](AspireWeb.Web/Clients/TodoApiClient.cs) (authenticated) or
   [WeatherApiClient.cs](AspireWeb.Web/Clients/WeatherApiClient.cs) (anonymous) — no hardcoded URLs.
@@ -80,8 +82,10 @@ Cross-service calls use Aspire **service discovery** (`https+http://apiservice`)
 - **Central Package Management**: versions live in [Directory.Packages.props](Directory.Packages.props);
   a `Version=` attribute on a PackageReference fails restore (NU1008).
 - **EF Core 11 preview pins move together**: every EF-adjacent package **and the `dotnet-ef` local
-  tool** stay on the same `11.0.0-preview.*` build; at RC/GA regenerate (don't chain) the two
-  Initial migrations. The Aspire EF integration is deliberately NOT used (compiled against EF 10) —
+  tool** stay on the same `11.0.0-preview.*` build; at RC/GA regenerate the migrations from scratch
+  (don't chain onto the previews) — and fold in the App context's follow-up migration
+  (`DropRedundantTodoTenantIndex`), which already sits on top of its initial one, rather than
+  assuming one migration per context. The Aspire EF integration is deliberately NOT used (compiled against EF 10) —
   DB access goes through `Aspire.Npgsql` + plain `UseNpgsql`. Detail: `/ef-migration` and the
   comments in Directory.Packages.props.
 - Keep builds warning-clean: they must pass `dotnet build -warnaserror`.
@@ -120,7 +124,7 @@ MSBuild `/t:` switches get mangled by Git-Bash path conversion — use `-t:` or 
 **Secrets (one-time per machine):** the web→api JWT signing key is an AppHost secret parameter;
 `aspire run` and the services fail fast without it:
 `dotnet user-secrets set "Parameters:jwt-signing-key" "<base64-32-bytes>" --project AspireWeb.AppHost`.
-Tests pin their own deterministic key (`AppFixture.JwtSigningKey`) — no setup needed.
+Tests pin their own deterministic key (`TestTokens.JwtSigningKey`) — no setup needed.
 
 ### EF Core migrations
 
@@ -165,7 +169,8 @@ package without reading its comment.**
 
 Before considering a change done: `dotnet build AspireWeb.slnx -c Release -warnaserror` **and**
 `dotnet test --solution AspireWeb.slnx -c Release` must both pass (the integration tier boots the
-AppHost and needs a running **Docker** engine; first run pulls the Postgres image). Inner loop: the
+AppHost and needs a running **Docker** engine; first run pulls the Postgres image). The `/validate`
+command runs this exact restore → build → test gate. Inner loop: the
 fast tier runs in seconds without Docker — but the full suite gates "done". For runtime-behavior
 changes, also exercise the affected page/endpoint — the `verify-app` skill has the recipe (run the
 app, two-tenant `/todos` isolation check, `/debug/claims`).

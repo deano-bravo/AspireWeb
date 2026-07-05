@@ -1,6 +1,8 @@
+using System.Reflection;
 using AspireWeb.Data;
 using AspireWeb.Data.Entities;
 using AspireWeb.Data.Tenancy;
+using AspireWeb.ServiceDefaults.Tenancy;
 using Microsoft.EntityFrameworkCore;
 
 namespace AspireWeb.Tests;
@@ -86,6 +88,22 @@ public class TenancyModelTests
 
         using var contextA2 = CreateInMemoryContext(new FixedTenantContext(tenantA), store);
         Assert.Single(await contextA2.TodoItems.ToListAsync(cancellationToken));
+    }
+
+    [Fact]
+    public void TenantRoleNamesMatchTheTenantRoleEnum()
+    {
+        // The tenant_role claim is minted from TenantRole.ToString() and read back by name, so a
+        // renamed enum member or constant would silently break authorization. Guard the contract.
+        string[] enumNames = Enum.GetNames<TenantRole>();
+        var constantValues = typeof(TenantRoleNames)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(field => field.IsLiteral && field.FieldType == typeof(string))
+            .Select(field => (string)field.GetRawConstantValue()!);
+
+        Assert.Equal(
+            enumNames.OrderBy(name => name, StringComparer.Ordinal),
+            constantValues.OrderBy(value => value, StringComparer.Ordinal));
     }
 
     private static TenantDbContext CreateModelOnlyContext() =>

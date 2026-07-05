@@ -2,7 +2,7 @@ using AspireWeb.ApiService.Endpoints;
 using AspireWeb.ApiService.Tenancy;
 using AspireWeb.Data;
 using AspireWeb.Data.Tenancy;
-using AspireWeb.ServiceDefaults;
+using AspireWeb.ServiceDefaults.Tenancy;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 

@@ -5,22 +5,20 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace AspireWeb.Data.DesignTime;
 
-public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<ApplicationDbContext>
+public sealed class AppIdentityDbContextFactory : IDesignTimeDbContextFactory<AppIdentityDbContext>
 {
-    public ApplicationDbContext CreateDbContext(string[] args)
+    public AppIdentityDbContext CreateDbContext(string[] args)
     {
         // IdentityDbContext reads Stores.SchemaVersion from the application service provider,
         // and the shared schema version must match the runtime configuration in the Web host.
         var services = new ServiceCollection();
         services.Configure<IdentityOptions>(options => options.Stores.SchemaVersion = AppIdentityDefaults.StoreSchemaVersion);
 
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(
-                DesignTimeConnection.ConnectionString,
-                npgsql => npgsql.MigrationsHistoryTable(ApplicationDbContext.MigrationsHistoryTableName))
+        var options = new DbContextOptionsBuilder<AppIdentityDbContext>()
+            .UseDesignTimeNpgsql(AppIdentityDbContext.MigrationsHistoryTableName)
             .UseApplicationServiceProvider(services.BuildServiceProvider())
             .Options;
 
-        return new ApplicationDbContext(options);
+        return new AppIdentityDbContext(options);
     }
 }

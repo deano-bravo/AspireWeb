@@ -1,4 +1,4 @@
-namespace AspireWeb.ServiceDefaults;
+namespace AspireWeb.ServiceDefaults.Tenancy;
 
 /// <summary>
 /// The tenant claims contract shared by the web front end (cookie principal) and the

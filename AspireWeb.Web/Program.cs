@@ -1,7 +1,8 @@
 using System.Security.Claims;
 using AspireWeb.Data;
-using AspireWeb.Web;
+using AspireWeb.Web.Clients;
 using AspireWeb.Web.Components;
+using AspireWeb.Web.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,9 @@ builder.Services.AddOutputCache();
 // Each host keeps its own Aspire data-source registration; the DbContext wiring lives in
 // AspireWeb.Data's AddIdentityDbContext (invoked by AddWebIdentity).
 builder.AddNpgsqlDataSource(DatabaseNames.AppDatabase);
+
+// Cross-cutting clock (injected by TenantTokenService and TenantProvisioningService).
+builder.Services.AddSingleton(TimeProvider.System);
 
 // Composition split out of this file (see ServiceCollectionExtensions).
 builder.Services.AddApiClients();

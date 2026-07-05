@@ -8,8 +8,8 @@ namespace AspireWeb.Data;
 /// <summary>
 /// Tenant-scoped business data, used by the API service and the migration service.
 /// Every ITenantOwned entity gets the named "Tenant" global query filter by convention;
-/// never call the bare IgnoreQueryFilters() — use IgnoreQueryFilters([TenantFilterName])
-/// only where crossing tenants is explicitly justified.
+/// never drop it with a bare, name-less IgnoreQueryFilters call — pass the named filter,
+/// IgnoreQueryFilters([TenantFilterName]), only where crossing tenants is explicitly justified.
 /// </summary>
 public sealed class TenantDbContext(DbContextOptions<TenantDbContext> options, ITenantContext tenantContext)
     : DbContext(options)
@@ -29,8 +29,7 @@ public sealed class TenantDbContext(DbContextOptions<TenantDbContext> options, I
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Owned by ApplicationDbContext's migrations; mapped here only for queries + FK integrity.
-        modelBuilder.Entity<Tenant>().ToTable(Tenant.TableName, t => t.ExcludeFromMigrations());
+        modelBuilder.Entity<Tenant>().ConfigureTenant(ownsSchema: false);
 
         modelBuilder.Entity<TodoItem>(item =>
         {

@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using AspireWeb.ServiceDefaults;
+using AspireWeb.ServiceDefaults.Tenancy;
 using AspireWeb.Web.Identity;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Configuration;
@@ -132,7 +132,7 @@ public class TenantTokenServiceTests
     private static TenantTokenService CreateService(
         ClaimsPrincipal principal, TimeProvider? timeProvider = null, IConfiguration? configuration = null) =>
         new(new FakeAuthenticationStateProvider(principal),
-            configuration ?? Configuration(AppFixture.JwtSigningKey),
+            configuration ?? Configuration(TestTokens.JwtSigningKey),
             timeProvider ?? TimeProvider.System);
 
     private static ClaimsPrincipal OwnerPrincipal() => Principal(
@@ -156,7 +156,7 @@ public class TenantTokenServiceTests
     /// <summary>The exact parameters the API's JwtBearer enforces, via the shared factory.</summary>
     private static async Task<TokenValidationResult> ValidateAsync(string token) =>
         await new JsonWebTokenHandler().ValidateTokenAsync(token,
-            ApiJwtDefaults.CreateValidationParameters(Convert.FromBase64String(AppFixture.JwtSigningKey)));
+            ApiJwtDefaults.CreateValidationParameters(Convert.FromBase64String(TestTokens.JwtSigningKey)));
 
     private static string? GetClaim(TokenValidationResult result, string type) =>
         result.ClaimsIdentity.FindFirst(type)?.Value;

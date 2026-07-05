@@ -15,7 +15,7 @@ if omitted — entity/table changes in `TenantDbContext` → app, Identity/`Tena
    DB connection needed; history tables are `__ef_migrations_identity` / `__ef_migrations_app`):
 
    ```powershell
-   dotnet ef migrations add <Name> --project AspireWeb.Data --startup-project AspireWeb.Data --context ApplicationDbContext --output-dir Migrations/Identity
+   dotnet ef migrations add <Name> --project AspireWeb.Data --startup-project AspireWeb.Data --context AppIdentityDbContext --output-dir Migrations/Identity
    dotnet ef migrations add <Name> --project AspireWeb.Data --startup-project AspireWeb.Data --context TenantDbContext      --output-dir Migrations/App
    ```
 
@@ -30,5 +30,7 @@ if omitted — entity/table changes in `TenantDbContext` → app, Identity/`Tena
 5. Verify: `dotnet build AspireWeb.slnx -c Release -warnaserror` and the fast test tier
    (`dotnet test --solution AspireWeb.slnx -c Release -- --filter-not-trait Category=Integration`).
 
-At EF 11 RC/GA: **regenerate (don't chain)** the two Initial migrations, bumping every
-EF-adjacent package and the `dotnet-ef` local tool together.
+At EF 11 RC/GA: **regenerate the migrations from scratch** (don't chain onto the previews),
+bumping every EF-adjacent package and the `dotnet-ef` local tool together. The App context now
+carries a follow-up migration (`DropRedundantTodoTenantIndex`) on top of its initial one — fold
+that index change into the regenerated baseline rather than assuming one migration per context.

@@ -2,7 +2,7 @@
 @rendermode InteractiveServer
 @attribute [Authorize]
 @using Microsoft.AspNetCore.Authorization
-@using AspireWeb.ServiceDefaults
+@using AspireWeb.ServiceDefaults.Tenancy
 
 @inject TodoApiClient TodoApi
 
@@ -72,16 +72,10 @@ else
 
     private async Task AddTodoAsync()
     {
-        errorMessage = null;
         var outcome = await TodoApi.CreateTodoAsync(newTitle.Trim());
-        if (outcome != TodoWriteOutcome.Success)
+        errorMessage = outcome.Describe(TodoWriteOperation.Add);
+        if (outcome is not TodoWriteOutcome.Success)
         {
-            errorMessage = outcome switch
-            {
-                TodoWriteOutcome.DuplicateTitle => "A todo with that title already exists.",
-                TodoWriteOutcome.Forbidden => "You are not allowed to add todos.",
-                _ => "The todo could not be added — please try again.",
-            };
             return;
         }
 
@@ -91,22 +85,14 @@ else
 
     private async Task DeleteTodoAsync(Guid id)
     {
-        errorMessage = null;
         var outcome = await TodoApi.DeleteTodoAsync(id);
-        switch (outcome)
-        {
-            case TodoWriteOutcome.Forbidden:
-                errorMessage = "Only organisation admins or owners can delete todos.";
-                return;
-            case TodoWriteOutcome.Failed:
-                errorMessage = "The todo could not be deleted — please try again.";
-                return;
-            case TodoWriteOutcome.NotFound:
-                errorMessage = "That todo was already removed.";
-                break;
-        }
+        errorMessage = outcome.Describe(TodoWriteOperation.Delete);
 
-        await RefreshAsync();
+        // Forbidden/Failed leave the list unchanged; Success and NotFound (already gone) refresh it.
+        if (outcome is TodoWriteOutcome.Success or TodoWriteOutcome.NotFound)
+        {
+            await RefreshAsync();
+        }
     }
 
     private async Task RefreshAsync()

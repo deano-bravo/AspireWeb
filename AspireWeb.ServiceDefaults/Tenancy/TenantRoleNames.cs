@@ -1,4 +1,4 @@
-namespace AspireWeb.ServiceDefaults;
+namespace AspireWeb.ServiceDefaults.Tenancy;
 
 /// <summary>
 /// The tenant_role claim values. Must stay in sync with the TenantRole enum in

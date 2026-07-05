@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
-namespace AspireWeb.ServiceDefaults;
+namespace AspireWeb.ServiceDefaults.Tenancy;
 
 /// <summary>
 /// The contract for the short-lived JWT the web front end mints to call the API service

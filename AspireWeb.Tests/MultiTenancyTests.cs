@@ -1,5 +1,4 @@
-using AspireWeb.Contracts;
-using AspireWeb.ServiceDefaults;
+using AspireWeb.ServiceDefaults.Tenancy;
 
 namespace AspireWeb.Tests;
 
@@ -17,14 +16,14 @@ public class MultiTenancyTests(AppFixture fixture)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = fixture.CreateWebClientWithCookies();
-        string organization = AppFixture.UniqueOrganization("acme");
+        string organization = RegistrationFlow.UniqueOrganization("acme");
 
-        var claims = await AppFixture.RegisterAsync(
-            client, organization, $"owner-{Guid.NewGuid():N}@example.com", AppFixture.DefaultPassword, cancellationToken);
+        var claims = await RegistrationFlow.RegisterAsync(
+            client, organization, $"owner-{Guid.NewGuid():N}@example.com", RegistrationFlow.DefaultPassword, cancellationToken);
 
-        Assert.True(Guid.TryParse(AppFixture.GetClaim(claims, TenantClaimTypes.TenantId), out _));
-        Assert.Equal(TenantRoleNames.Owner, AppFixture.GetClaim(claims, TenantClaimTypes.TenantRole));
-        Assert.Equal(organization, AppFixture.GetClaim(claims, TenantClaimTypes.TenantName));
+        Assert.True(Guid.TryParse(RegistrationFlow.GetClaim(claims, TenantClaimTypes.TenantId), out _));
+        Assert.Equal(TenantRoleNames.Owner, RegistrationFlow.GetClaim(claims, TenantClaimTypes.TenantRole));
+        Assert.Equal(organization, RegistrationFlow.GetClaim(claims, TenantClaimTypes.TenantName));
     }
 
     [Fact]
@@ -36,26 +35,26 @@ public class MultiTenancyTests(AppFixture fixture)
         using var api = fixture.App.CreateHttpClient("apiservice");
 
         string secretTitle = $"alpha-secret-{Guid.NewGuid():N}";
-        string tokenA = AppFixture.MintJwt(tenantA, userA, TenantRoleNames.Owner);
-        string tokenB = AppFixture.MintJwt(tenantB, userB, TenantRoleNames.Owner);
+        string tokenA = TestTokens.MintJwt(tenantA, userA, TenantRoleNames.Owner);
+        string tokenB = TestTokens.MintJwt(tenantB, userB, TenantRoleNames.Owner);
 
-        using (var create = AppFixture.ApiRequest(HttpMethod.Post, "/todos", tokenA))
+        using (var create = TestTokens.ApiRequest(HttpMethod.Post, "/todos", tokenA))
         {
             create.Content = JsonContent.Create(new { title = secretTitle });
             using var created = await api.SendAsync(create, cancellationToken);
             Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         }
 
-        Assert.Contains(await GetTodoTitlesAsync(api, tokenA, cancellationToken), title => title == secretTitle);
-        Assert.DoesNotContain(await GetTodoTitlesAsync(api, tokenB, cancellationToken), title => title == secretTitle);
+        Assert.Contains(await api.GetTodoTitlesAsync(tokenA, cancellationToken), title => title == secretTitle);
+        Assert.DoesNotContain(await api.GetTodoTitlesAsync(tokenB, cancellationToken), title => title == secretTitle);
 
         // A spoofed tenant header alongside B's token must change nothing: the tenant
         // comes from the validated token only.
-        using var spoofed = AppFixture.ApiRequest(HttpMethod.Get, "/todos", tokenB);
+        using var spoofed = TestTokens.ApiRequest(HttpMethod.Get, "/todos", tokenB);
         spoofed.Headers.Add("X-Tenant-Id", tenantA.ToString());
         using var spoofedResponse = await api.SendAsync(spoofed, cancellationToken);
         Assert.Equal(HttpStatusCode.OK, spoofedResponse.StatusCode);
-        string[] titles = await ReadTitlesAsync(spoofedResponse, cancellationToken);
+        string[] titles = await spoofedResponse.ReadTitlesAsync(cancellationToken);
         Assert.DoesNotContain(titles, title => title == secretTitle);
     }
 
@@ -71,38 +70,23 @@ public class MultiTenancyTests(AppFixture fixture)
         Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
 
         // Token signed with the wrong key -> 401.
-        string forged = AppFixture.MintJwt(
+        string forged = TestTokens.MintJwt(
             tenantId, userId, TenantRoleNames.Owner,
             signingKey: Convert.ToBase64String(Enumerable.Repeat((byte)0xFF, 32).ToArray()));
-        using var forgedRequest = AppFixture.ApiRequest(HttpMethod.Get, "/todos", forged);
+        using var forgedRequest = TestTokens.ApiRequest(HttpMethod.Get, "/todos", forged);
         using var forgedResponse = await api.SendAsync(forgedRequest, cancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, forgedResponse.StatusCode);
 
         // Valid key but no tenant claim -> 403 (RequireTenant policy).
-        string noTenant = AppFixture.MintJwt(tenantId: null, userId, TenantRoleNames.Owner);
-        using var noTenantRequest = AppFixture.ApiRequest(HttpMethod.Get, "/todos", noTenant);
+        string noTenant = TestTokens.MintJwt(tenantId: null, userId, TenantRoleNames.Owner);
+        using var noTenantRequest = TestTokens.ApiRequest(HttpMethod.Get, "/todos", noTenant);
         using var noTenantResponse = await api.SendAsync(noTenantRequest, cancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, noTenantResponse.StatusCode);
 
         // Member role may not delete -> 403 (RequireTenantAdmin policy).
-        string member = AppFixture.MintJwt(tenantId, userId, TenantRoleNames.Member);
-        using var deleteRequest = AppFixture.ApiRequest(HttpMethod.Delete, $"/todos/{Guid.NewGuid()}", member);
+        string member = TestTokens.MintJwt(tenantId, userId, TenantRoleNames.Member);
+        using var deleteRequest = TestTokens.ApiRequest(HttpMethod.Delete, $"/todos/{Guid.NewGuid()}", member);
         using var deleteResponse = await api.SendAsync(deleteRequest, cancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, deleteResponse.StatusCode);
-    }
-
-    private static async Task<string[]> GetTodoTitlesAsync(
-        HttpClient api, string token, CancellationToken cancellationToken)
-    {
-        using var request = AppFixture.ApiRequest(HttpMethod.Get, "/todos", token);
-        using var response = await api.SendAsync(request, cancellationToken);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return await ReadTitlesAsync(response, cancellationToken);
-    }
-
-    private static async Task<string[]> ReadTitlesAsync(HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        var items = await response.Content.ReadFromJsonAsync<List<TodoItemDto>>(cancellationToken);
-        return items?.Select(item => item.Title).ToArray() ?? [];
     }
 }

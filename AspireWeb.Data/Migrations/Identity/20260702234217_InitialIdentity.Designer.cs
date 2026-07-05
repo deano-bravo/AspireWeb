@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 namespace AspireWeb.Data.Migrations.Identity;
 
-[DbContext(typeof(ApplicationDbContext))]
+[DbContext(typeof(AppIdentityDbContext))]
 [Migration("20260702234217_InitialIdentity")]
 partial class _20260702234217_InitialIdentity
 {

@@ -1,5 +1,6 @@
 namespace AspireWeb.Data.Entities;
 
+/// <summary>A tenant-owned to-do item; <see cref="TenantId"/> is stamped on insert by the save interceptor.</summary>
 public sealed class TodoItem : ITenantOwned
 {
     public const int TitleMaxLength = 256;

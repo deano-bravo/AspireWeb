@@ -8,7 +8,7 @@ namespace AspireWeb.Data.Entities;
 public sealed class Tenant
 {
     /// <summary>
-    /// Single source of truth for the table name: ApplicationDbContext owns the table,
+    /// Single source of truth for the table name: AppIdentityDbContext owns the table,
     /// TenantDbContext maps it FK-only (ExcludeFromMigrations) — both must agree.
     /// </summary>
     public const string TableName = "Tenants";

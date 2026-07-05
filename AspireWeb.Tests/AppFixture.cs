@@ -1,11 +1,7 @@
-using System.Net.Http.Headers;
 using System.Security.Claims;
-using System.Text.RegularExpressions;
 using Aspire.Hosting;
-using AspireWeb.ServiceDefaults;
+using AspireWeb.ServiceDefaults.Tenancy;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Tokens;
 
 namespace AspireWeb.Tests;
 
@@ -13,15 +9,11 @@ namespace AspireWeb.Tests;
 /// Boots the full AppHost (Postgres container + migrations + services) once for the
 /// <see cref="AppHostCollectionDefinition"/> collection. Requires a running Docker engine;
 /// startup is bounded by <see cref="StartupTimeout"/> to cover a cold Postgres image pull.
+/// Registration/claims helpers live in <see cref="RegistrationFlow"/>; token/request helpers in
+/// <see cref="TestTokens"/>.
 /// </summary>
-public sealed partial class AppFixture : IAsyncLifetime
+public sealed class AppFixture : IAsyncLifetime
 {
-    /// <summary>Deterministic signing key so tests can mint their own API tokens.</summary>
-    public const string JwtSigningKey = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=";
-
-    /// <summary>Meets the server password policy (PasswordPolicy.MinimumLength).</summary>
-    public const string DefaultPassword = "Sup3r-Secret-Pass!42";
-
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(3);
 
     private DistributedApplication? _app;
@@ -32,7 +24,7 @@ public sealed partial class AppFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.AspireWeb_AppHost>();
-        appHost.Configuration["Parameters:jwt-signing-key"] = JwtSigningKey;
+        appHost.Configuration["Parameters:jwt-signing-key"] = TestTokens.JwtSigningKey;
         appHost.Services.AddLogging(logging =>
         {
             logging.SetMinimumLevel(LogLevel.Information);
@@ -64,121 +56,26 @@ public sealed partial class AppFixture : IAsyncLifetime
         };
     }
 
-    /// <summary>
-    /// Drives the real Register page: fetches it, re-posts every hidden field (antiforgery
-    /// token, form handler) plus the visible inputs, then proves the client is signed in by
-    /// returning the principal's claims from the dev-only /debug/claims endpoint.
-    /// </summary>
-    public static async Task<IReadOnlyList<TestClaim>> RegisterAsync(
-        HttpClient client, string organization, string email, string password, CancellationToken cancellationToken)
-    {
-        string page = await client.GetStringAsync("/Account/Register", cancellationToken);
-
-        var form = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (Match hidden in HiddenInputRegex().Matches(page))
-        {
-            var name = NameAttributeRegex().Match(hidden.Value);
-            if (name.Success)
-            {
-                var value = ValueAttributeRegex().Match(hidden.Value);
-                form[name.Groups["name"].Value] = value.Success ? value.Groups["value"].Value : "";
-            }
-        }
-
-        form["Input.OrganizationName"] = organization;
-        form["Input.Email"] = email;
-        form["Input.Password"] = password;
-        form["Input.ConfirmPassword"] = password;
-
-        string action = FormActionRegex().Match(page) is { Success: true } match && match.Groups["action"].Value.Length > 0
-            ? match.Groups["action"].Value
-            : "/Account/Register";
-
-        using var content = new FormUrlEncodedContent(form);
-        using var response = await client.PostAsync(action, content, cancellationToken);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        return await GetClaimsAsync(client, cancellationToken);
-    }
-
-    /// <summary>Reads the signed-in principal's claims via the dev-only /debug/claims endpoint.</summary>
-    public static async Task<IReadOnlyList<TestClaim>> GetClaimsAsync(HttpClient client, CancellationToken cancellationToken)
-    {
-        var claims = await client.GetFromJsonAsync<List<TestClaim>>("/debug/claims", cancellationToken);
-        Assert.NotNull(claims);
-        return claims;
-    }
-
     /// <summary>Registers a fresh organisation + owner and returns their ids from the claims.</summary>
     public async Task<(Guid TenantId, string UserId)> RegisterTenantAsync(
         string prefix, CancellationToken cancellationToken)
     {
         using var client = CreateWebClientWithCookies();
-        var claims = await RegisterAsync(
-            client, UniqueOrganization(prefix), $"{prefix}-{Guid.NewGuid():N}@example.com",
-            DefaultPassword, cancellationToken);
+        var claims = await RegistrationFlow.RegisterAsync(
+            client, RegistrationFlow.UniqueOrganization(prefix), $"{prefix}-{Guid.NewGuid():N}@example.com",
+            RegistrationFlow.DefaultPassword, cancellationToken);
 
-        var tenantId = Guid.Parse(GetClaim(claims, TenantClaimTypes.TenantId)!);
-        string userId = GetClaim(claims, ClaimTypes.NameIdentifier)!;
+        var tenantId = Guid.Parse(RegistrationFlow.GetClaim(claims, TenantClaimTypes.TenantId)!);
+        string userId = RegistrationFlow.GetClaim(claims, ClaimTypes.NameIdentifier)!;
         return (tenantId, userId);
     }
 
-    /// <summary>A bearer-authenticated request for the API service.</summary>
-    public static HttpRequestMessage ApiRequest(HttpMethod method, string uri, string token)
+    /// <summary>Registers a fresh owner tenant and returns an API client plus the owner's bearer token.</summary>
+    public async Task<(HttpClient Api, string OwnerToken)> CreateOwnerApiClientAsync(
+        string prefix, CancellationToken cancellationToken)
     {
-        var request = new HttpRequestMessage(method, uri);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        return request;
+        var (tenantId, userId) = await RegisterTenantAsync(prefix, cancellationToken);
+        string token = TestTokens.MintJwt(tenantId, userId, TenantRoleNames.Owner);
+        return (App.CreateHttpClient("apiservice"), token);
     }
-
-    public static string? GetClaim(IReadOnlyList<TestClaim> claims, string type) =>
-        claims.FirstOrDefault(claim => claim.Type == type)?.Value;
-
-    public static string UniqueOrganization(string prefix) => $"{prefix} {Guid.NewGuid():N}";
-
-    /// <summary>
-    /// Mints an API token the way the web front end does (or a forged/partial one). Deliberately
-    /// re-implements TenantTokenService's descriptor so tests can forge partial/wrong-key tokens —
-    /// keep the claim shape in sync with that service.
-    /// </summary>
-    public static string MintJwt(
-        Guid? tenantId, string userId, string role = TenantRoleNames.Member, string? signingKey = null)
-    {
-        var claims = new Dictionary<string, object>(StringComparer.Ordinal)
-        {
-            [JwtRegisteredClaimNames.Sub] = userId,
-            [TenantClaimTypes.TenantRole] = role,
-        };
-        if (tenantId is { } id)
-        {
-            claims[TenantClaimTypes.TenantId] = id.ToString();
-        }
-
-        var now = DateTime.UtcNow;
-        var descriptor = new SecurityTokenDescriptor
-        {
-            Issuer = ApiJwtDefaults.Issuer,
-            Audience = ApiJwtDefaults.Audience,
-            IssuedAt = now,
-            Expires = now.Add(ApiJwtDefaults.TokenLifetime),
-            Claims = claims,
-            SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Convert.FromBase64String(signingKey ?? JwtSigningKey)),
-                SecurityAlgorithms.HmacSha256),
-        };
-
-        return new JsonWebTokenHandler().CreateToken(descriptor);
-    }
-
-    [GeneratedRegex("<input\\b[^>]*type=\"hidden\"[^>]*>", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 2000)]
-    private static partial Regex HiddenInputRegex();
-
-    [GeneratedRegex("name=\"(?<name>[^\"]*)\"", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 2000)]
-    private static partial Regex NameAttributeRegex();
-
-    [GeneratedRegex("value=\"(?<value>[^\"]*)\"", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 2000)]
-    private static partial Regex ValueAttributeRegex();
-
-    [GeneratedRegex("<form\\b[^>]*method=\"post\"[^>]*action=\"(?<action>[^\"]*)\"", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 2000)]
-    private static partial Regex FormActionRegex();
 }

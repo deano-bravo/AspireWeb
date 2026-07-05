@@ -1,7 +1,6 @@
 using System.Text.Json;
 using AspireWeb.Contracts;
 using AspireWeb.Data.Entities;
-using AspireWeb.ServiceDefaults;
 
 namespace AspireWeb.Tests;
 
@@ -18,10 +17,10 @@ public class TodoEndpointTests(AppFixture fixture)
     public async Task CreateTodoWithEmptyTitleReturnsValidationProblem()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (api, token) = await CreateOwnerApiClientAsync("empty", cancellationToken);
+        var (api, token) = await fixture.CreateOwnerApiClientAsync("empty", cancellationToken);
         using var client = api;
 
-        using var response = await PostTodoAsync(client, token, "   ", cancellationToken);
+        using var response = await client.PostTodoAsync(token, "   ", cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var errors = await ReadProblemAsync(response, "errors", cancellationToken);
@@ -32,11 +31,11 @@ public class TodoEndpointTests(AppFixture fixture)
     public async Task CreateTodoWithOverlongTitleReturnsValidationProblem()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (api, token) = await CreateOwnerApiClientAsync("long", cancellationToken);
+        var (api, token) = await fixture.CreateOwnerApiClientAsync("long", cancellationToken);
         using var client = api;
 
-        using var response = await PostTodoAsync(
-            client, token, new string('x', TodoItem.TitleMaxLength + 1), cancellationToken);
+        using var response = await client.PostTodoAsync(
+            token, new string('x', TodoItem.TitleMaxLength + 1), cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var errors = await ReadProblemAsync(response, "errors", cancellationToken);
@@ -47,15 +46,15 @@ public class TodoEndpointTests(AppFixture fixture)
     public async Task CreateTodoWithDuplicateTitleReturnsConflictProblem()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (api, token) = await CreateOwnerApiClientAsync("dup", cancellationToken);
+        var (api, token) = await fixture.CreateOwnerApiClientAsync("dup", cancellationToken);
         using var client = api;
         string title = $"Report {Guid.NewGuid():N}";
 
-        using var created = await PostTodoAsync(client, token, title, cancellationToken);
+        using var created = await client.PostTodoAsync(token, title, cancellationToken);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
         // Same title after normalization (trim + uppercase) — exercises the unique index.
-        using var duplicate = await PostTodoAsync(client, token, $"  {title.ToUpperInvariant()} ", cancellationToken);
+        using var duplicate = await client.PostTodoAsync(token, $"  {title.ToUpperInvariant()} ", cancellationToken);
 
         Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
         var problemTitle = await ReadProblemAsync(duplicate, "title", cancellationToken);
@@ -66,52 +65,33 @@ public class TodoEndpointTests(AppFixture fixture)
     public async Task OwnerCanDeleteTodo()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (api, token) = await CreateOwnerApiClientAsync("delete", cancellationToken);
+        var (api, token) = await fixture.CreateOwnerApiClientAsync("delete", cancellationToken);
         using var client = api;
         string title = $"disposable-{Guid.NewGuid():N}";
 
-        using var created = await PostTodoAsync(client, token, title, cancellationToken);
+        using var created = await client.PostTodoAsync(token, title, cancellationToken);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var item = await created.Content.ReadFromJsonAsync<TodoItemDto>(cancellationToken);
         Assert.NotNull(item);
 
-        using var deleteRequest = AppFixture.ApiRequest(HttpMethod.Delete, $"/todos/{item.Id}", token);
+        using var deleteRequest = TestTokens.ApiRequest(HttpMethod.Delete, $"/todos/{item.Id}", token);
         using var deleted = await client.SendAsync(deleteRequest, cancellationToken);
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
 
-        using var listRequest = AppFixture.ApiRequest(HttpMethod.Get, "/todos", token);
-        using var list = await client.SendAsync(listRequest, cancellationToken);
-        var remaining = await list.Content.ReadFromJsonAsync<List<TodoItemDto>>(cancellationToken);
-        Assert.DoesNotContain(remaining ?? [], todo => todo.Title == title);
+        Assert.DoesNotContain(await client.GetTodoTitlesAsync(token, cancellationToken), remaining => remaining == title);
     }
 
     [Fact]
     public async Task DeleteMissingTodoReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var (api, token) = await CreateOwnerApiClientAsync("missing", cancellationToken);
+        var (api, token) = await fixture.CreateOwnerApiClientAsync("missing", cancellationToken);
         using var client = api;
 
-        using var request = AppFixture.ApiRequest(HttpMethod.Delete, $"/todos/{Guid.NewGuid()}", token);
+        using var request = TestTokens.ApiRequest(HttpMethod.Delete, $"/todos/{Guid.NewGuid()}", token);
         using var response = await client.SendAsync(request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    private async Task<(HttpClient Api, string OwnerToken)> CreateOwnerApiClientAsync(
-        string prefix, CancellationToken cancellationToken)
-    {
-        var (tenantId, userId) = await fixture.RegisterTenantAsync($"todoapi-{prefix}", cancellationToken);
-        string token = AppFixture.MintJwt(tenantId, userId, TenantRoleNames.Owner);
-        return (fixture.App.CreateHttpClient("apiservice"), token);
-    }
-
-    private static async Task<HttpResponseMessage> PostTodoAsync(
-        HttpClient api, string token, string title, CancellationToken cancellationToken)
-    {
-        using var request = AppFixture.ApiRequest(HttpMethod.Post, "/todos", token);
-        request.Content = JsonContent.Create(new { title });
-        return await api.SendAsync(request, cancellationToken);
     }
 
     /// <summary>Asserts the RFC 7807 content type and returns the requested root property.</summary>

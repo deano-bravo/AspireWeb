@@ -2,6 +2,7 @@ using System.Text;
 
 namespace AspireWeb.Data.Tenancy;
 
+/// <summary>Derives a URL-safe, unique tenant slug from a free-text organisation name.</summary>
 public static class TenantSlug
 {
     /// <summary>

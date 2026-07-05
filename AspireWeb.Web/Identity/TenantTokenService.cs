@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using AspireWeb.ServiceDefaults;
+using AspireWeb.ServiceDefaults.Tenancy;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -49,8 +49,7 @@ public sealed class TenantTokenService(
             {
                 [JwtRegisteredClaimNames.Sub] = userId,
                 [TenantClaimTypes.TenantId] = tenantId,
-                [TenantClaimTypes.TenantRole] =
-                    user.FindFirstValue(TenantClaimTypes.TenantRole) ?? TenantRoleNames.Member,
+                [TenantClaimTypes.TenantRole] = user.GetTenantRole() ?? TenantRoleNames.Member,
             },
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(signingKeyBytes),

@@ -29,7 +29,7 @@ jobs:
       - name: Fast tests
         run: >
           dotnet test --solution AspireWeb.slnx -c Release --no-build
-          --results-directory ./TestResults --minimum-expected-tests 10
+          --results-directory ./TestResults --minimum-expected-tests 14
           -- --filter-not-trait Category=Integration --report-xunit-trx
           --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
 

@@ -25,15 +25,13 @@ public static class ServiceCollectionExtensions
     {
         services.TryAddScoped<TenantSaveChangesInterceptor>();
         services.AddDbContext<TenantDbContext>((provider, options) =>
-            options.UseNpgsql(provider.GetRequiredService<NpgsqlDataSource>(), npgsql =>
-                    npgsql.MigrationsHistoryTable(TenantDbContext.MigrationsHistoryTableName)
-                        .EnableRetryOnFailure())
+            options.UseAppNpgsql(provider, TenantDbContext.MigrationsHistoryTableName)
                 .AddInterceptors(provider.GetRequiredService<TenantSaveChangesInterceptor>()));
         return services;
     }
 
     /// <summary>
-    /// Registers <see cref="ApplicationDbContext"/> (Identity + tenant registry) and owns the
+    /// Registers <see cref="AppIdentityDbContext"/> (Identity + tenant registry) and owns the
     /// Identity store schema-version pin — callers of <c>AddIdentityCore</c> must not set
     /// <c>Stores.SchemaVersion</c> again (both configure actions would run; this one must stand).
     /// </summary>
@@ -41,10 +39,15 @@ public static class ServiceCollectionExtensions
     {
         services.Configure<IdentityOptions>(options =>
             options.Stores.SchemaVersion = AppIdentityDefaults.StoreSchemaVersion);
-        services.AddDbContext<ApplicationDbContext>((provider, options) =>
-            options.UseNpgsql(provider.GetRequiredService<NpgsqlDataSource>(), npgsql =>
-                npgsql.MigrationsHistoryTable(ApplicationDbContext.MigrationsHistoryTableName)
-                    .EnableRetryOnFailure()));
+        services.AddDbContext<AppIdentityDbContext>((provider, options) =>
+            options.UseAppNpgsql(provider, AppIdentityDbContext.MigrationsHistoryTableName));
         return services;
     }
+
+    // Shared Npgsql wiring so both contexts get the same data source, retry policy, and
+    // history-table setup; only the migrations-history table name differs.
+    private static DbContextOptionsBuilder UseAppNpgsql(
+        this DbContextOptionsBuilder options, IServiceProvider provider, string migrationsHistoryTable) =>
+        options.UseNpgsql(provider.GetRequiredService<NpgsqlDataSource>(), npgsql =>
+            npgsql.MigrationsHistoryTable(migrationsHistoryTable).EnableRetryOnFailure());
 }

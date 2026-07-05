@@ -3,7 +3,7 @@ using AspireWeb.Data.Tenancy;
 namespace AspireWeb.ApiService.Tenancy;
 
 /// <summary>Rejects requests whose resolved tenant is missing or deactivated (403).</summary>
-public sealed class RequireActiveTenantFilter(ITenantContext tenantContext, ActiveTenantGate gate) : IEndpointFilter
+internal sealed class RequireActiveTenantFilter(ITenantContext tenantContext, ActiveTenantGate gate) : IEndpointFilter
 {
     public async ValueTask<object?> InvokeAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
