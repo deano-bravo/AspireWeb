@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AspireWeb.Data\AspireWeb.Data.csproj" />
+    <ProjectReference Include="..\AspireWeb.ServiceDefaults\AspireWeb.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

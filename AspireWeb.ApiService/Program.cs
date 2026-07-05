@@ -1,3 +1,12 @@
+using AspireWeb.ApiService.Endpoints;
+using AspireWeb.ApiService.Tenancy;
+using AspireWeb.Data;
+using AspireWeb.Data.Tenancy;
+using AspireWeb.ServiceDefaults;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
@@ -9,6 +18,39 @@ builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Tenant-scoped data access: tenant resolved from the validated JWT, reads isolated by
+// the named query filter, writes stamped/guarded by the interceptor.
+builder.AddNpgsqlDataSource("appdb");
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<ITenantContext, ClaimsTenantContext>();
+builder.Services.AddScoped<ActiveTenantGate>();
+builder.Services.AddAppDbContext();
+
+// Bearer auth for the self-issued web-to-api JWT (see ApiJwtDefaults for the contract).
+byte[] signingKeyBytes = ApiJwtDefaults.GetSigningKeyBytes(builder.Configuration);
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        // Keep raw claim names (sub / tenant_id) — the shared contract with the web front end.
+        options.MapInboundClaims = false;
+        // Tokens are validated by key; there is no metadata endpoint, and in-cluster traffic is HTTP.
+        options.RequireHttpsMetadata = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidIssuer = ApiJwtDefaults.Issuer,
+            ValidAudience = ApiJwtDefaults.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(signingKeyBytes),
+            ClockSkew = ApiJwtDefaults.ClockSkew,
+        };
+    });
+
+builder.Services.AddTenantPolicies();
+// Unmapped endpoints fail closed; anonymous ones must opt out explicitly.
+builder.Services.AddAuthorizationBuilder()
+    .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -16,32 +58,15 @@ app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.MapOpenApi().AllowAnonymous();
 }
 
-string[] summaries = ["Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"];
+app.MapGet("/", () => "API service is running. Navigate to /weatherforecast to see sample data.")
+    .AllowAnonymous();
 
-app.MapGet("/", () => "API service is running. Navigate to /weatherforecast to see sample data.");
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+app.MapWeatherEndpoints();
+app.MapTodoEndpoints();
 
 app.MapDefaultEndpoints();
 
-app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
+await app.RunAsync();

@@ -8,7 +8,10 @@ Validate the AspireWeb solution end-to-end and report the results concisely.
 
 1. `aspire restore` (fall back to `dotnet restore AspireWeb.slnx` if the Aspire CLI is unavailable).
 2. `dotnet build AspireWeb.slnx -c Release -warnaserror` — must be warning-clean.
-3. `dotnet test AspireWeb.slnx -c Release` — all tests must pass.
+3. `dotnet test --solution AspireWeb.slnx -c Release` — all tests must pass (needs Docker;
+   the `--solution` form is required by the Microsoft.Testing.Platform runner opted into in
+   global.json). If Docker is unavailable, run the fast tier instead and say so:
+   `dotnet test --solution AspireWeb.slnx -c Release -- --filter-not-trait Category=Integration`.
 
 If any step fails, stop and show the relevant error output; do not proceed to the next step.
 Report a one-line pass/fail summary for each step at the end.

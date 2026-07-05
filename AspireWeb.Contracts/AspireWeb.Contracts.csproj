@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Shared web↔api wire contracts. Deliberately dependency-free so any future client
+       (mobile, CLI, external) can reference it without dragging in ASP.NET Core or EF. -->
+
+</Project>

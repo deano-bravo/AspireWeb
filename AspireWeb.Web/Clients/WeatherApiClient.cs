@@ -1,6 +1,8 @@
-namespace AspireWeb.Web;
+using AspireWeb.Contracts;
 
-public class WeatherApiClient(HttpClient httpClient)
+namespace AspireWeb.Web.Clients;
+
+public sealed class WeatherApiClient(HttpClient httpClient)
 {
     public async Task<WeatherForecast[]> GetWeatherAsync(int maxItems = 10, CancellationToken cancellationToken = default)
     {
@@ -21,9 +23,4 @@ public class WeatherApiClient(HttpClient httpClient)
 
         return forecasts?.ToArray() ?? [];
     }
-}
-
-public record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
 }

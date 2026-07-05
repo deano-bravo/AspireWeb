@@ -2,6 +2,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AspireWeb.ServiceDefaults\AspireWeb.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\AspireWeb.Contracts\AspireWeb.Contracts.csproj" />
+    <ProjectReference Include="..\AspireWeb.Data\AspireWeb.Data.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql" />
+    <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
   </ItemGroup>
 
 </Project>
